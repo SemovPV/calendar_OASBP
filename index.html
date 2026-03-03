@@ -47,11 +47,6 @@
                 <h2>📅 Производственный календарь</h2>
             </div>
             
-            <div class="alert-info">
-                <strong>⚠️ Важно:</strong> Автоматическая загрузка может не работать из-за блокировки CORS. 
-                Если не получается — используйте ручной режим (Ctrl+U на consultant.ru).
-            </div>
-            
             <div class="form-row">
                 <div class="form-field">
                     <label>Год</label>
@@ -64,8 +59,9 @@
                     <label>Источник</label>
                     <div class="input-wrapper">
                         <span class="input-icon">🌐</span>
-                        <select id="calSource" onchange="toggleHtmlInput()">
-                            <option value="proxy">Consultant.ru (авто)</option>
+                        <select id="calSource">
+                            <option value="proxy1">Consultant.ru (прокси 1)</option>
+                            <option value="proxy2">Consultant.ru (прокси 2)</option>
                             <option value="html">HTML код (вручную)</option>
                         </select>
                     </div>
@@ -74,7 +70,7 @@
 
             <div id="htmlInput" class="html-input-wrapper hidden">
                 <label>HTML-код страницы consultant.ru</label>
-                <textarea id="htmlContent" rows="4" placeholder="1. Откройте https://www.consultant.ru/law/ref/calendar/proizvodstvennye/2026/&#10;2. Нажмите Ctrl+U (просмотр кода)&#10;3. Нажмите Ctrl+A (выделить всё)&#10;4. Нажмите Ctrl+C (копировать)&#10;5. Вставьте код сюда"></textarea>
+                <textarea id="htmlContent" rows="3" placeholder="Откройте consultant.ru → Ctrl+U → скопируйте весь код → вставьте сюда"></textarea>
             </div>
 
             <div class="button-group">
@@ -158,13 +154,10 @@
                 </div>
             </div>
 
-            <!-- График удалёнки - ВСЕГДА виден после загрузки данных -->
-            <div class="remote-schedule-section" id="remoteScheduleSection" style="display: none;">
+            <!-- График удалёнки -->
+            <div class="remote-schedule-section hidden" id="remoteScheduleSection">
                 <div class="section-divider"></div>
-                <h3 class="section-title">📋 График удалённой работы на месяц</h3>
-                <p class="section-description">
-                    Формируется график на основе: производственного календаря, дней удалёнки каждого сотрудника и отпусков/больничных
-                </p>
+                <h3 class="section-title">📋 График удалённой работы</h3>
                 
                 <div class="form-row">
                     <div class="form-field">
@@ -201,7 +194,7 @@
                 </div>
 
                 <div id="remoteStatus" class="status-message"></div>
-                <div id="remotePreview" class="result-table-wrapper" style="display: none;"></div>
+                <div id="remotePreview" class="result-table-wrapper hidden"></div>
             </div>
         </section>
 
@@ -248,10 +241,7 @@
                         <div class="legend-item"><span class="legend-color sick"></span>Больничный</div>
                     </div>
                 </div>
-                <div class="chart-scroll-wrapper">
-                    <div id="chartContent" class="chart-content"></div>
-                </div>
-                <p class="chart-hint">💡 Прокручивайте вправо/влево для просмотра месяцев</p>
+                <div id="chartContent" class="chart-content"></div>
             </div>
         </section>
 
