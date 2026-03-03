@@ -1,6 +1,6 @@
 /**
- * 📅 График удалённой работы — Упрощённая версия
- * Один Excel-файл → Два отчёта
+ * 📅 График удалённой работы — Liquid Glass версия
+ * Современный дизайн с анимациями
  */
 
 // ==================== ГЛОБАЛЬНЫЕ ДАННЫЕ ====================
@@ -14,6 +14,7 @@ let visualCalendarData = [];
 document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
     loadDataFromStorage();
+    updateProgress(1);
 });
 
 function initEventListeners() {
@@ -22,8 +23,43 @@ function initEventListeners() {
     if (calSource) {
         calSource.addEventListener('change', (e) => {
             const htmlInput = document.getElementById('htmlInput');
-            if (htmlInput) htmlInput.classList.toggle('hidden', e.target.value !== 'html');
+            if (htmlInput) {
+                htmlInput.classList.toggle('hidden', e.target.value !== 'html');
+            }
         });
+    }
+    
+    // Drag & Drop для файла
+    const dropZone = document.querySelector('.file-upload-label');
+    if (dropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+        });
+        
+        dropZone.addEventListener('drop', handleDrop, false);
+    }
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    const fileInput = document.getElementById('dataFile');
+    if (files.length > 0 && fileInput) {
+        fileInput.files = files;
+        showToast(`📁 Файл "${files[0].name}" выбран`);
     }
 }
 
@@ -48,16 +84,40 @@ function loadDataFromStorage() {
             if (data.calYear && document.getElementById('calYear')) {
                 document.getElementById('calYear').value = data.calYear;
             }
+            // Если данные есть, показываем превью
+            if (employees.length > 0 || absences.length > 0) {
+                renderDataPreview();
+            }
+            if (Object.keys(productionCalendar).length > 0) {
+                const year = document.getElementById('calYear')?.value || new Date().getFullYear();
+                renderCalendarPreview(productionCalendar, year);
+                updateProgress(2);
+            }
         }
     } catch (e) { console.warn('Load error:', e); }
 }
 
 function clearAllData() {
-    if (confirm('⚠️ Удалить все данные?')) {
+    if (confirm('⚠️ Удалить все данные? Это действие нельзя отменить.')) {
         localStorage.removeItem('calendarData');
         productionCalendar = {}; employees = []; absences = [];
+        remoteSchedule = []; visualCalendarData = [];
         location.reload();
     }
+}
+
+// ==================== ПРОГРЕСС ====================
+function updateProgress(step) {
+    document.querySelectorAll('.progress-step').forEach((s, i) => {
+        s.classList.remove('active', 'completed');
+        if (i + 1 < step) s.classList.add('completed');
+        if (i + 1 === step) s.classList.add('active');
+    });
+    
+    document.querySelectorAll('.step-content').forEach((c, i) => {
+        c.classList.remove('active');
+        if (i + 1 === step) c.classList.add('active');
+    });
 }
 
 // ==================== ШАГ 1: КАЛЕНДАРЬ ====================
@@ -66,7 +126,7 @@ async function loadCalendar() {
     const source = document.getElementById('calSource').value;
     const status = document.getElementById('calStatus');
     
-    showStatus(status, 'loading', '⏳ Загрузка...');
+    showStatus(status, 'loading', '⏳ Загрузка производственного календаря...');
 
     try {
         let html = '';
@@ -78,18 +138,20 @@ async function loadCalendar() {
             html = await res.text();
         } else {
             html = document.getElementById('htmlContent').value;
-            if (!html.trim()) throw new Error('Вставьте HTML-код');
+            if (!html.trim()) throw new Error('Вставьте HTML-код страницы');
         }
         
         productionCalendar = parseCalendarFromHTML(html, year);
         renderCalendarPreview(productionCalendar, year);
         
-        showStatus(status, 'success', `✅ Загружено! Рабочих дней: ${Object.values(productionCalendar).filter(d => d.isWorking).length}`);
+        showStatus(status, 'success', `✅ Календарь загружен! Рабочих дней: ${Object.values(productionCalendar).filter(d => d.isWorking).length}`);
+        showToast('📅 Календарь успешно загружен');
         saveDataToStorage();
-        activateStep(2);
+        updateProgress(2);
         
     } catch (e) {
-        showStatus(status, 'error', `❌ ${e.message}<br><small>💡 Попробуйте: consultant.ru → Ctrl+U → скопировать код → вставить в поле</small>`);
+        showStatus(status, 'error', `❌ ${e.message}<br><small>💡 Откройте consultant.ru → Ctrl+U → скопируйте код → вставьте в поле</small>`);
+        showToast('❌ Ошибка загрузки календаря', 'error');
     }
 }
 
@@ -125,7 +187,6 @@ function parseCalendarFromHTML(html, year) {
         });
     });
     
-    // Дополняем недостающие дни
     for (let m = 1; m <= 12; m++) {
         const days = new Date(year, m, 0).getDate();
         for (let d = 1; d <= days; d++) {
@@ -185,20 +246,19 @@ function renderCalendarPreview(calendar, year) {
     }
 }
 
-// ==================== ШАГ 2: ЗАГРУЗКА ДАННЫХ ====================
+// ==================== ШАГ 2: ДАННЫЕ ====================
 async function loadDataFile() {
     const file = document.getElementById('dataFile')?.files[0];
     const status = document.getElementById('dataStatus');
     
-    if (!file) { showStatus(status, 'error', '⚠️ Выберите файл'); return; }
+    if (!file) { showStatus(status, 'error', '⚠️ Выберите файл Excel'); showToast('⚠️ Выберите файл', 'error'); return; }
     
     showStatus(status, 'loading', '⏳ Чтение файла...');
-    
+
     try {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data);
         
-        // Чтение листа "Сотрудники"
         const empSheet = workbook.Sheets['Сотрудники'] || workbook.Sheets['Employees'];
         if (!empSheet) throw new Error('Лист "Сотрудники" не найден');
         employees = XLSX.utils.sheet_to_json(empSheet).map(row => ({
@@ -208,7 +268,6 @@ async function loadDataFile() {
                 .toLowerCase().split(',').map(d => d.trim()).filter(d => d)
         })).filter(e => e.id && e.name);
         
-        // Чтение листа "Отпуска и больничные"
         const absSheet = workbook.Sheets['Отпуска и больничные'] || workbook.Sheets['Absences'];
         if (!absSheet) throw new Error('Лист "Отпуска и больничные" не найден');
         absences = XLSX.utils.sheet_to_json(absSheet).map(row => ({
@@ -220,16 +279,16 @@ async function loadDataFile() {
             days: parseInt(row['Кол-во дней'] || row['days'] || 0) || 0
         })).filter(a => a.empId && a.start && a.end);
         
-        // Превью
         renderDataPreview();
         
         showStatus(status, 'success', `✅ Загружено: ${employees.length} сотрудников, ${absences.length} записей`);
+        showToast(`✅ ${employees.length} сотрудников загружено`);
         saveDataToStorage();
-        activateStep(3);
+        updateProgress(3);
         
     } catch (e) {
         showStatus(status, 'error', `❌ ${e.message}`);
-        console.error(e);
+        showToast('❌ Ошибка загрузки файла', 'error');
     }
 }
 
@@ -237,7 +296,6 @@ function parseExcelDate(value) {
     if (value instanceof Date) return value;
     if (typeof value === 'number') return new Date(Math.round((value - 25569) * 86400 * 1000));
     if (typeof value === 'string') {
-        // Поддержка формата дд.мм.гггг
         const parts = value.split('.');
         if (parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]);
         const d = new Date(value);
@@ -254,13 +312,11 @@ function renderDataPreview() {
     document.getElementById('empCount').textContent = employees.length;
     document.getElementById('absCount').textContent = absences.length;
     
-    // Превью сотрудников
     const empTbody = document.getElementById('previewEmployees');
     empTbody.innerHTML = employees.slice(0, 10).map(e => 
         `<tr><td>${escapeHtml(e.id)}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.remoteDays.join(', '))}</td></tr>`
     ).join('') || '<tr><td colspan="3" class="text-center">—</td></tr>';
     
-    // Превью отпусков
     const absTbody = document.getElementById('previewAbsences');
     absTbody.innerHTML = absences.slice(0, 10).map(a => 
         `<tr><td>${escapeHtml(a.empId)}</td><td>${escapeHtml(a.type)}</td><td>${formatDate(a.start)} – ${formatDate(a.end)}</td></tr>`
@@ -278,18 +334,20 @@ function generateRemoteSchedule() {
         return;
     }
     if (employees.length === 0) {
-        showStatus(status, 'error', '⚠️ Сначала загрузите данные сотрудников (Шаг 2)');
+        showStatus(status, 'error', '⚠️ Сначала загрузите данные (Шаг 2)');
         return;
     }
     
-    showStatus(status, 'loading', '⏳ Формирование...');
+    showStatus(status, 'loading', '⏳ Формирование графика...');
     
     try {
         remoteSchedule = generateRemoteLogic(year, month);
         showRemotePreview(remoteSchedule);
         showStatus(status, 'success', `✅ Готово: ${remoteSchedule.length} записей`);
+        showToast(`📋 График сформирован: ${remoteSchedule.length} записей`);
     } catch (e) {
         showStatus(status, 'error', `❌ ${e.message}`);
+        showToast('❌ Ошибка формирования графика', 'error');
     }
 }
 
@@ -373,14 +431,16 @@ function generateVisualCalendar() {
         return;
     }
     
-    showStatus(status, 'loading', '⏳ Генерация...');
+    showStatus(status, 'loading', '⏳ Генерация визуального календаря...');
     
     try {
         visualCalendarData = generateVisualLogic(year);
         showVisualPreview(visualCalendarData, year);
         showStatus(status, 'success', `✅ Готово: ${visualCalendarData.length} сотрудников`);
+        showToast('🎨 Визуальный календарь создан');
     } catch (e) {
         showStatus(status, 'error', `❌ ${e.message}`);
+        showToast('❌ Ошибка генерации', 'error');
     }
 }
 
@@ -476,7 +536,6 @@ function downloadResults() {
     const month = document.getElementById('remoteMonth')?.value || 1;
     const monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
     
-    // Лист 1: График удалёнки
     if (remoteSchedule.length > 0) {
         const data = remoteSchedule.map(r => ({
             'Табельный номер': r.empId,
@@ -489,7 +548,6 @@ function downloadResults() {
         XLSX.utils.book_append_sheet(wb, ws, 'График удалёнки');
     }
     
-    // Лист 2: Сводка
     if (visualCalendarData.length > 0) {
         const data = visualCalendarData.map(v => ({
             'Таб.№': v.empId, 'Специалист': v.name, 'Всего дней отпуска': v.totalDays
@@ -498,9 +556,10 @@ function downloadResults() {
         XLSX.utils.book_append_sheet(wb, ws, 'Сводка');
     }
     
-    if (wb.SheetNames.length === 0) { alert('⚠️ Нет данных для экспорта'); return; }
+    if (wb.SheetNames.length === 0) { showToast('⚠️ Нет данных для экспорта', 'error'); return; }
     
     XLSX.writeFile(wb, `График_удалёнки_${monthNames[month-1]}_${year}.xlsx`);
+    showToast('💾 Файл скачан');
 }
 
 function exportDataJSON() {
@@ -510,24 +569,26 @@ function exportDataJSON() {
     a.href = URL.createObjectURL(blob);
     a.download = `calendar-data-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
+    showToast('📄 JSON экспортирован');
 }
 
 // ==================== УТИЛИТЫ ====================
 function showStatus(el, type, msg) {
     if (!el) return;
-    el.className = `status-box visible status-${type}`;
+    el.className = `status-message visible status-${type}`;
     el.innerHTML = msg;
 }
 
-function activateStep(n) {
-    for (let i = 1; i <= 3; i++) {
-        const ind = document.getElementById(`step${i}-indicator`);
-        const sec = document.getElementById(`step${i}`);
-        if (!ind || !sec) continue;
-        if (i < n) { ind.className = 'step-indicator step-completed'; sec.classList.remove('disabled'); }
-        else if (i === n) { ind.className = 'step-indicator step-active'; sec.classList.remove('disabled'); }
-        else { ind.className = 'step-indicator'; sec.classList.add('disabled'); }
-    }
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    
+    toast.textContent = message;
+    toast.className = `toast visible ${type === 'error' ? 'toast-error' : ''}`;
+    
+    setTimeout(() => {
+        toast.classList.remove('visible');
+    }, 3000);
 }
 
 function formatDate(d) {
