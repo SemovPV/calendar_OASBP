@@ -1,11 +1,12 @@
 /**
- * 📅 График удалённой работы — Исправленная версия
- * Все 3 шага видны всегда + надёжная загрузка календаря
+ * 📅 График удалённой работы — Финальная версия
+ * Все исправления: автозагрузка календаря, автозагрузка файла, график удалёнки
  */
 
 let productionCalendar = {};
 let employees = [];
 let absences = [];
+let remoteSchedule = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
@@ -45,7 +46,7 @@ function handleDrop(e) {
     const fileInput = document.getElementById('dataFile');
     if (files.length > 0 && fileInput) {
         fileInput.files = files;
-        showToast(`📁 Файл "${files[0].name}" выбран`);
+        loadDataFile(); // Автозагрузка
     }
 }
 
@@ -76,6 +77,7 @@ function loadDataFromStorage() {
             }
             if (employees.length > 0 || absences.length > 0) {
                 renderDataPreview();
+                document.getElementById('remoteScheduleSection')?.classList.remove('hidden');
                 updateProgress(3);
             }
         }
@@ -87,12 +89,6 @@ function clearAllData() {
         localStorage.removeItem('calendarData');
         location.reload();
     }
-}
-
-// Навигация между шагами
-function goToStep(step) {
-    updateProgress(step);
-    document.getElementById(`step${step}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function updateProgress(step) {
@@ -114,26 +110,42 @@ async function loadCalendar() {
     try {
         let html = '';
         
-        if (source === 'proxy') {
-            // Пробуем несколько источников
-            try {
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`;
-                const res = await fetch(proxyUrl, { timeout: 10000 });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                html = await res.text();
-                
-                // Проверяем, что это действительно календарь
-                if (!html.includes('table') || !html.includes('cal')) {
-                    throw new Error('Страница не содержит календарь');
-                }
-            } catch (e) {
-                console.log('Proxy failed:', e.message);
-                throw new Error('Автозагрузка не удалась. Пожалуйста, используйте ручной режим:<br>1. Откройте <a href="https://www.consultant.ru/law/ref/calendar/proizvodstvennye/' + year + '/" target="_blank">consultant.ru</a><br>2. Нажмите Ctrl+U<br>3. Скопируйте весь код (Ctrl+A, Ctrl+C)<br>4. Вставьте в поле "HTML код" выше<br>5. Нажмите "Загрузить календарь"');
-            }
-        } else {
+        if (source === 'html') {
             html = document.getElementById('htmlContent').value;
             if (!html.trim() || html.length < 1000) {
                 throw new Error('Вставьте полный HTML-код страницы (Ctrl+U → Ctrl+A → Ctrl+C)');
+            }
+        } else {
+            // Пробуем разные прокси
+            const proxyUrls = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`,
+                `https://corsproxy.io/?${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`
+            ];
+            
+            let lastError = '';
+            for (const proxyUrl of proxyUrls) {
+                try {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 10000);
+                    
+                    const res = await fetch(proxyUrl, { signal: controller.signal });
+                    clearTimeout(timeout);
+                    
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    html = await res.text();
+                    
+                    if (html.includes('table') && html.includes('cal')) {
+                        break;
+                    }
+                } catch (e) {
+                    lastError = e.message;
+                    continue;
+                }
+            }
+            
+            if (!html || !html.includes('table')) {
+                throw new Error('Автозагрузка не удалась. Пожалуйста:<br>1. Откройте <a href="https://www.consultant.ru/law/ref/calendar/proizvodstvennye/' + year + '/" target="_blank">consultant.ru</a><br>2. Нажмите Ctrl+U<br>3. Скопируйте весь код (Ctrl+A, Ctrl+C)<br>4. Выберите "HTML код (вручную)" и вставьте код<br>5. Нажмите "Загрузить календарь"');
             }
         }
         
@@ -160,10 +172,6 @@ function parseCalendarFromHTML(html, year) {
     const calendar = {};
     const monthNames = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 
-    if (tables.length === 0) {
-        console.warn('No tables found, generating default calendar');
-    }
-
     tables.forEach(table => {
         let currentMonth = null;
         table.querySelectorAll('tr').forEach(row => {
@@ -189,7 +197,6 @@ function parseCalendarFromHTML(html, year) {
         });
     });
     
-    // Дополняем недостающие дни
     for (let m = 1; m <= 12; m++) {
         const days = new Date(year, m, 0).getDate();
         for (let d = 1; d <= days; d++) {
@@ -249,7 +256,7 @@ function renderCalendarPreview(calendar, year) {
     }
 }
 
-// ==================== ШАГ 2: ДАННЫЕ ====================
+// ==================== ШАГ 2: ДАННЫЕ (АВТОЗАГРУЗКА) ====================
 async function loadDataFile() {
     const file = document.getElementById('dataFile')?.files[0];
     const status = document.getElementById('dataStatus');
@@ -262,7 +269,6 @@ async function loadDataFile() {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data);
         
-        // Ищем листы (поддержка разных названий)
         const empSheetName = workbook.SheetNames.find(n => n.includes('Сотрудник') || n.includes('Employee'));
         const absSheetName = workbook.SheetNames.find(n => n.includes('Отпуск') || n.includes('Absence') || n.includes('Больнич'));
         
@@ -289,9 +295,11 @@ async function loadDataFile() {
         })).filter(a => a.empId && a.start && a.end);
         
         if (employees.length === 0) throw new Error('Не найдено сотрудников в файле');
-        if (absences.length === 0) throw new Error('Не найдено записей об отпусках');
         
         renderDataPreview();
+        
+        // Показываем секцию графика удалёнки
+        document.getElementById('remoteScheduleSection')?.classList.remove('hidden');
         
         showStatus(status, 'success', `✅ Загружено: ${employees.length} сотрудников, ${absences.length} записей`);
         showToast(`✅ ${employees.length} сотрудников загружено`);
@@ -335,7 +343,166 @@ function renderDataPreview() {
     ).join('') || '<tr><td colspan="3" class="text-center">—</td></tr>';
 }
 
-// ==================== ШАГ 3: ГРАФИК ====================
+// ==================== ГРАФИК УДАЛЁНКИ (как в макросе VBA) ====================
+function generateRemoteSchedule() {
+    const month = parseInt(document.getElementById('remoteMonth')?.value || 1);
+    const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
+    const status = document.getElementById('remoteStatus');
+    
+    if (Object.keys(productionCalendar).length === 0) {
+        showStatus(status, 'error', '⚠️ Сначала загрузите календарь (Шаг 1)');
+        return;
+    }
+    if (employees.length === 0) {
+        showStatus(status, 'error', '⚠️ Сначала загрузите данные (Шаг 2)');
+        return;
+    }
+    
+    showStatus(status, 'loading', '⏳ Формирование графика удалёнки...');
+    
+    try {
+        remoteSchedule = generateRemoteLogic(year, month);
+        showRemotePreview(remoteSchedule);
+        showStatus(status, 'success', `✅ Готово: ${remoteSchedule.length} записей`);
+        showToast(`📋 График сформирован: ${remoteSchedule.length} записей`);
+    } catch (e) {
+        showStatus(status, 'error', `❌ ${e.message}`);
+    }
+}
+
+function generateRemoteLogic(year, month) {
+    // Логика из VBA макроса "Заполнить_График_Удалёнки()"
+    const schedule = [];
+    const firstDay = new Date(year, month-1, 1);
+    const lastDay = new Date(year, month, 0);
+    const dayNames = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+    
+    // Словари отсутствий
+    const regularAbs = {};
+    const remoteSick = {};
+    
+    absences.forEach(a => {
+        if (!regularAbs[a.empId]) regularAbs[a.empId] = [];
+        if (a.type === 'Больничный удаленно') {
+            if (!remoteSick[a.empId]) remoteSick[a.empId] = [];
+            remoteSick[a.empId].push({start: a.start, end: a.end});
+        } else {
+            regularAbs[a.empId].push({start: a.start, end: a.end});
+        }
+    });
+    
+    employees.forEach(emp => {
+        const dates = [];
+        
+        for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate()+1)) {
+            const key = formatDateKey(d);
+            
+            // Проверка: рабочий день по производственному календарю
+            if (!productionCalendar[key]?.isWorking) continue;
+            
+            // Проверка: сотрудник в отпуске/на обычном больничном (исключаем)
+            const isRegularAbsent = regularAbs[emp.id]?.some(p => d >= p.start && d <= p.end);
+            if (isRegularAbsent) continue;
+            
+            // Проверка: больничный удаленно (добавляем даже если не день по графику)
+            const isRemoteSick = remoteSick[emp.id]?.some(p => d >= p.start && d <= p.end);
+            
+            // Проверка: день по графику удалёнки
+            const wd = dayNames[d.getDay()];
+            const isPreferredDay = emp.remoteDays.some(pref => wd.includes(pref));
+            
+            // Добавляем если: день по графику ИЛИ больничный удаленно
+            if ((isPreferredDay && !isRemoteSick) || isRemoteSick) {
+                dates.push(new Date(d));
+            }
+        }
+        
+        // Группировка последовательных дат (как в VBA)
+        if (dates.length > 0) {
+            const groups = groupDates(dates);
+            groups.forEach(g => {
+                schedule.push({
+                    empId: emp.id,
+                    empName: emp.name,
+                    start: g.start,
+                    end: g.end
+                });
+            });
+        }
+    });
+    
+    return schedule;
+}
+
+function groupDates(dates) {
+    if (!dates.length) return [];
+    const groups = [];
+    let start = new Date(dates[0]), end = new Date(dates[0]);
+    
+    for (let i = 1; i < dates.length; i++) {
+        const next = new Date(dates[i]);
+        const expected = new Date(end);
+        expected.setDate(expected.getDate() + 1);
+        
+        if (next.getTime() === expected.getTime()) {
+            end = next;
+        } else {
+            groups.push({start: new Date(start), end: new Date(end)});
+            start = end = next;
+        }
+    }
+    groups.push({start: new Date(start), end: new Date(end)});
+    return groups;
+}
+
+function showRemotePreview(schedule) {
+    const preview = document.getElementById('remotePreview');
+    if (!preview) return;
+    preview.classList.remove('hidden');
+    
+    let html = '<table class="data-table"><thead><tr>';
+    html += '<th>Табельный номер</th><th>Специалист</th><th>Дата начала</th><th>Дата окончания</th></tr></thead><tbody>';
+    
+    schedule.forEach(r => {
+        html += `<tr>
+            <td>${escapeHtml(r.empId)}</td>
+            <td>${escapeHtml(r.empName)}</td>
+            <td>${formatDate(r.start)}</td>
+            <td>${formatDate(r.end)}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    preview.innerHTML = html;
+}
+
+function downloadRemoteSchedule() {
+    if (remoteSchedule.length === 0) {
+        showToast('⚠️ Сначала сформируйте график', 'error');
+        return;
+    }
+    
+    const year = document.getElementById('calYear')?.value || new Date().getFullYear();
+    const month = document.getElementById('remoteMonth')?.value || 1;
+    const monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    
+    const data = remoteSchedule.map(r => ({
+        'Табельный номер': r.empId,
+        'Дата начала (дд.мм.гггг)': formatDate(r.start),
+        'Дата окончания (дд.мм.гггг)': formatDate(r.end),
+        'Специалист': r.empName
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{wch:12}, {wch:15}, {wch:15}, {wch:25}];
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'График удалёнки');
+    
+    XLSX.writeFile(wb, `График_удалёнки_${monthNames[month-1]}_${year}.xlsx`);
+    showToast('💾 Файл скачан');
+}
+
+// ==================== ШАГ 3: ГРАФИК ОТПУСКОВ ====================
 function generateVacationChart() {
     const status = document.getElementById('chartStatus');
     const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
@@ -385,7 +552,7 @@ function renderVacationChart(year, period) {
         };
     });
     
-    // Добавляем сотрудников из отпусков, которых нет в списке сотрудников
+    // Добавляем сотрудников из отпусков
     absences.filter(a => a.start.getFullYear() === year).forEach(a => {
         if (!empAbsences[a.empId]) {
             empAbsences[a.empId] = { name: a.name || a.empId, periods: [] };
@@ -433,14 +600,15 @@ function renderVacationChart(year, period) {
                 else if (period.type && period.type.includes('Больничный')) className += ' sick';
                 else if (period.type && !period.type.includes('Ежегодный')) className += ' other';
                 
+                const monthIndex = monthsToShow.indexOf(m);
                 const daysInMonth = new Date(year, m + 1, 0).getDate();
                 const startOffset = m === startMonth ? (period.start.getDate() - 1) / daysInMonth : 0;
                 const endOffset = m === endMonth ? (daysInMonth - period.end.getDate()) / daysInMonth : 0;
                 
-                const left = monthsToShow.indexOf(m) * (100 / monthsToShow.length) + (startOffset * (100 / monthsToShow.length));
+                const left = monthIndex * (100 / monthsToShow.length) + (startOffset * (100 / monthsToShow.length));
                 const width = ((100 / monthsToShow.length) * (1 - startOffset - endOffset));
                 
-                if (width > 3) {
+                if (width > 2) {
                     html += `<div class="${className}" style="left: ${left}%; width: ${width}%; position: absolute;">
                         <div class="bar-tooltip">
                             <strong>${escapeHtml(emp.name)}</strong><br>
@@ -448,7 +616,6 @@ function renderVacationChart(year, period) {
                             ${formatDate(period.start)} – ${formatDate(period.end)}<br>
                             ${period.days || Math.ceil((period.end-period.start)/86400000)+1} дн.
                         </div>
-                        ${monthNames[m]}
                     </div>`;
                 }
             }
@@ -537,12 +704,17 @@ function formatDate(d) {
     return `${String(date.getDate()).padStart(2,'0')}.${String(date.getMonth()+1).padStart(2,'0')}.${date.getFullYear()}`;
 }
 
+function formatDateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function escapeHtml(t) { const div = document.createElement('div'); div.textContent = t; return div.innerHTML; }
 
 window.loadCalendar = loadCalendar;
 window.loadDataFile = loadDataFile;
+window.generateRemoteSchedule = generateRemoteSchedule;
+window.downloadRemoteSchedule = downloadRemoteSchedule;
 window.generateVacationChart = generateVacationChart;
 window.downloadResults = downloadResults;
 window.exportDataJSON = exportDataJSON;
 window.clearAllData = clearAllData;
-window.goToStep = goToStep;
