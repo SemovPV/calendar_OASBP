@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📅 Система управления графиками</title>
+    
+    <!-- Библиотеки -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Наши стили -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        
+        <!-- Заголовок -->
+        <header>
+            <h1>📅 Система управления графиками</h1>
+            <p>Аналог VBA-макросов для веб-браузера</p>
+        </header>
+
+        <!-- Прогресс-бар шагов -->
+        <div class="steps-container">
+            <div id="step1-indicator" class="step-indicator step-active">
+                <span>1. Календарь</span>
+            </div>
+            <div id="step2-indicator" class="step-indicator">
+                <span>2. Удалёнка</span>
+            </div>
+            <div id="step3-indicator" class="step-indicator">
+                <span>3. Визуальный</span>
+            </div>
+        </div>
+
+        <!-- ШАГ 1: Загрузка производственного календаря -->
+        <section id="step1">
+            <h2>📅 Шаг 1: Производственный календарь</h2>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Год</label>
+                    <input type="number" id="calYear" value="2026" min="2020" max="2030">
+                </div>
+                <div class="form-group">
+                    <label>Способ загрузки</label>
+                    <select id="calSource">
+                        <option value="api">API (автоматически)</option>
+                        <option value="file">Excel файл</option>
+                        <option value="html">HTML код (вставить)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="htmlInput" class="form-group hidden mt-4">
+                <label>Вставьте HTML-код страницы consultant.ru</label>
+                <textarea id="htmlContent" rows="4" placeholder="<html>..."></textarea>
+            </div>
+
+            <div class="mt-4">
+                <input type="file" id="calFile" accept=".xlsx,.xls,.html" class="hidden">
+                <button onclick="loadCalendar()" class="btn btn-primary">
+                    🔽 Загрузить календарь
+                </button>
+            </div>
+
+            <div id="calStatus" class="status-box"></div>
+        </section>
+
+        <!-- ШАГ 2: Загрузка данных сотрудников и отсутствий -->
+        <section id="step2" class="disabled">
+            <h2>👥 Шаг 2: Данные сотрудников</h2>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Файл сотрудников (.xlsx)</label>
+                    <input type="file" id="empFile" accept=".xlsx,.xls">
+                    <p class="form-help">Лист: "Сотрудники" (ID, ФИО, Дни удалёнки)</p>
+                </div>
+                <div class="form-group">
+                    <label>Файл отсутствий (.xlsx)</label>
+                    <input type="file" id="absFile" accept=".xlsx,.xls">
+                    <p class="form-help">Лист: "Отпуска и больничные" (ID, Тип, Начало, Конец)</p>
+                </div>
+            </div>
+
+            <div class="form-grid mt-4">
+                <div class="form-group">
+                    <label>Месяц для графика удалёнки</label>
+                    <select id="remoteMonth">
+                        <option value="1">Январь</option>
+                        <option value="2">Февраль</option>
+                        <option value="3">Март</option>
+                        <option value="4">Апрель</option>
+                        <option value="5">Май</option>
+                        <option value="6">Июнь</option>
+                        <option value="7">Июль</option>
+                        <option value="8">Август</option>
+                        <option value="9">Сентябрь</option>
+                        <option value="10">Октябрь</option>
+                        <option value="11">Ноябрь</option>
+                        <option value="12">Декабрь</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button onclick="generateRemoteSchedule()" class="btn btn-success w-full">
+                        📋 Сформировать график удалёнки
+                    </button>
+                </div>
+            </div>
+
+            <div id="remoteStatus" class="status-box"></div>
+            <div id="remotePreview" class="table-container"></div>
+        </section>
+
+        <!-- ШАГ 3: Визуальный календарь -->
+        <section id="step3" class="disabled">
+            <h2>📊 Шаг 3: Визуальный календарь на год</h2>
+            
+            <div class="btn-group">
+                <button onclick="generateVisualCalendar()" class="btn btn-purple">
+                    🎨 Создать визуальный календарь
+                </button>
+                <button onclick="downloadAllResults()" class="btn btn-gray">
+                    💾 Скачать все результаты
+                </button>
+            </div>
+
+            <div id="visualStatus" class="status-box"></div>
+            <div id="visualPreview" class="table-container"></div>
+            
+            <!-- Легенда -->
+            <div class="legend">
+                <h3>Условные обозначения:</h3>
+                <div class="legend-grid">
+                    <div class="legend-item"><span class="legend-color absence-O"></span>Отпуск</div>
+                    <div class="legend-item"><span class="legend-color absence-Б"></span>Больничный</div>
+                    <div class="legend-item"><span class="legend-color absence-У"></span>Учебный</div>
+                    <div class="legend-item"><span class="legend-color absence-Д"></span>Декрет</div>
+                    <div class="legend-item"><span class="legend-color holiday"></span>Выходной</div>
+                    <div class="legend-item"><span class="legend-color overlap"></span>Пересечение</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Футер -->
+        <footer>
+            <p>Создано на основе VBA-макросов • Работает в браузере • Данные не отправляются на сервер</p>
+            <p class="mt-4">
+                <button onclick="clearLocalStorage()" class="btn btn-gray" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                    🗑️ Очистить сохранённые данные
+                </button>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Наша логика -->
+    <script src="app.js"></script>
+</body>
+</html>
