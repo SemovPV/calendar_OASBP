@@ -60,7 +60,8 @@
                     <div class="input-wrapper">
                         <span class="input-icon">🌐</span>
                         <select id="calSource">
-                            <option value="proxy">Consultant.ru (авто)</option>
+                            <option value="proxy1">Consultant.ru (прокси 1)</option>
+                            <option value="proxy2">Consultant.ru (прокси 2)</option>
                             <option value="html">HTML код (вручную)</option>
                         </select>
                     </div>
@@ -88,19 +89,13 @@
                 </div>
                 <div id="calendarGrid" class="calendar-grid"></div>
             </div>
-
-            <div class="step-navigation">
-                <button onclick="goToStep(2)" class="btn btn-primary">
-                    Далее: Шаг 2 →
-                </button>
-            </div>
         </section>
 
-        <!-- ШАГ 2: Загрузка данных -->
+        <!-- ШАГ 2: Загрузка данных + График удалёнки -->
         <section id="step2" class="glass-card step-content">
             <div class="step-header">
                 <span class="step-badge">Шаг 2</span>
-                <h2>📁 Загрузка данных сотрудников</h2>
+                <h2>📁 Данные сотрудников и график удалёнки</h2>
             </div>
             
             <div class="info-card">
@@ -115,22 +110,15 @@
             </div>
 
             <div class="file-upload-wrapper">
-                <input type="file" id="dataFile" accept=".xlsx,.xls" class="file-input">
+                <input type="file" id="dataFile" accept=".xlsx,.xls" class="file-input" onchange="loadDataFile()">
                 <label for="dataFile" class="file-upload-label">
                     <div class="upload-icon">📤</div>
                     <div class="upload-text">
                         <span class="upload-title">Нажмите для загрузки Excel-файла</span>
-                        <span class="upload-subtitle">или перетащите файл сюда</span>
+                        <span class="upload-subtitle">или перетащите файл сюда (загрузится автоматически)</span>
                     </div>
                     <div class="upload-hint">.xlsx, .xls до 10MB</div>
                 </label>
-            </div>
-
-            <div class="button-group">
-                <button onclick="loadDataFile()" class="btn btn-success btn-lg">
-                    <span class="btn-icon">📥</span>
-                    <span>Загрузить данные</span>
-                </button>
             </div>
 
             <div id="dataStatus" class="status-message"></div>
@@ -166,13 +154,51 @@
                 </div>
             </div>
 
-            <div class="step-navigation">
-                <button onclick="goToStep(1)" class="btn btn-secondary">← Назад</button>
-                <button onclick="goToStep(3)" class="btn btn-primary">Далее: Шаг 3 →</button>
+            <!-- График удалёнки -->
+            <div class="remote-schedule-section hidden" id="remoteScheduleSection">
+                <div class="section-divider"></div>
+                <h3 class="section-title">📋 График удалённой работы</h3>
+                
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>Месяц для графика</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">📅</span>
+                            <select id="remoteMonth">
+                                <option value="1">Январь</option>
+                                <option value="2">Февраль</option>
+                                <option value="3">Март</option>
+                                <option value="4">Апрель</option>
+                                <option value="5">Май</option>
+                                <option value="6">Июнь</option>
+                                <option value="7">Июль</option>
+                                <option value="8">Август</option>
+                                <option value="9">Сентябрь</option>
+                                <option value="10">Октябрь</option>
+                                <option value="11">Ноябрь</option>
+                                <option value="12">Декабрь</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="generateRemoteSchedule()" class="btn btn-success btn-lg">
+                        <span class="btn-icon">📊</span>
+                        <span>Сформировать график</span>
+                    </button>
+                    <button onclick="downloadRemoteSchedule()" class="btn btn-primary btn-lg">
+                        <span class="btn-icon">💾</span>
+                        <span>Скачать Excel</span>
+                    </button>
+                </div>
+
+                <div id="remoteStatus" class="status-message"></div>
+                <div id="remotePreview" class="result-table-wrapper hidden"></div>
             </div>
         </section>
 
-        <!-- ШАГ 3: Визуальный график -->
+        <!-- ШАГ 3: Визуальный график отпусков -->
         <section id="step3" class="glass-card step-content">
             <div class="step-header">
                 <span class="step-badge">Шаг 3</span>
@@ -184,7 +210,7 @@
                     <label>Период отображения</label>
                     <div class="input-wrapper">
                         <span class="input-icon">📅</span>
-                        <select id="viewPeriod">
+                        <select id="viewPeriod" onchange="generateVacationChart()">
                             <option value="year">2026 год (полный)</option>
                             <option value="H1">1 полугодие (янв-июн)</option>
                             <option value="H2">2 полугодие (июл-дек)</option>
@@ -202,14 +228,6 @@
                     <span class="btn-icon">🎨</span>
                     <span>Построить график</span>
                 </button>
-                <button onclick="downloadResults()" class="btn btn-primary btn-lg">
-                    <span class="btn-icon">💾</span>
-                    <span>Скачать Excel</span>
-                </button>
-                <button onclick="exportDataJSON()" class="btn btn-secondary btn-lg">
-                    <span class="btn-icon">📄</span>
-                    <span>Экспорт JSON</span>
-                </button>
             </div>
 
             <div id="chartStatus" class="status-message"></div>
@@ -224,10 +242,6 @@
                     </div>
                 </div>
                 <div id="chartContent" class="chart-content"></div>
-            </div>
-
-            <div class="step-navigation">
-                <button onclick="goToStep(2)" class="btn btn-secondary">← Назад</button>
             </div>
         </section>
 
