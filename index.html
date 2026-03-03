@@ -17,7 +17,7 @@
                 <span class="logo-icon">📅</span>
                 <div>
                     <h1>График удалёнки</h1>
-                    <p>Производственный календарь и планирование</p>
+                    <p>Производственный календарь и планирование отпусков</p>
                 </div>
             </div>
         </header>
@@ -41,7 +41,7 @@
         </div>
 
         <!-- ШАГ 1: Производственный календарь -->
-        <section id="step1" class="glass-card step-content active">
+        <section id="step1" class="glass-card step-content">
             <div class="step-header">
                 <span class="step-badge">Шаг 1</span>
                 <h2>📅 Производственный календарь</h2>
@@ -68,8 +68,8 @@
             </div>
 
             <div id="htmlInput" class="html-input-wrapper hidden">
-                <label>HTML-код страницы</label>
-                <textarea id="htmlContent" rows="3" placeholder="Откройте consultant.ru → Ctrl+U → скопируйте код"></textarea>
+                <label>HTML-код страницы consultant.ru</label>
+                <textarea id="htmlContent" rows="3" placeholder="Откройте consultant.ru → Ctrl+U → скопируйте весь код → вставьте сюда"></textarea>
             </div>
 
             <div class="button-group">
@@ -87,6 +87,12 @@
                     <span class="badge-success">Готово</span>
                 </div>
                 <div id="calendarGrid" class="calendar-grid"></div>
+            </div>
+
+            <div class="step-navigation">
+                <button onclick="goToStep(2)" class="btn btn-primary">
+                    Далее: Шаг 2 →
+                </button>
             </div>
         </section>
 
@@ -159,6 +165,11 @@
                     </div>
                 </div>
             </div>
+
+            <div class="step-navigation">
+                <button onclick="goToStep(1)" class="btn btn-secondary">← Назад</button>
+                <button onclick="goToStep(3)" class="btn btn-primary">Далее: Шаг 3 →</button>
+            </div>
         </section>
 
         <!-- ШАГ 3: Визуальный график -->
@@ -209,9 +220,14 @@
                     <div class="chart-legend">
                         <div class="legend-item"><span class="legend-color vacation"></span>Отпуск</div>
                         <div class="legend-item"><span class="legend-color overlap"></span>Пересечение</div>
+                        <div class="legend-item"><span class="legend-color sick"></span>Больничный</div>
                     </div>
                 </div>
                 <div id="chartContent" class="chart-content"></div>
+            </div>
+
+            <div class="step-navigation">
+                <button onclick="goToStep(2)" class="btn btn-secondary">← Назад</button>
             </div>
         </section>
 
@@ -223,7 +239,7 @@
         </footer>
     </div>
 
-    <div id="toast" class="toast hidden"></div>
+    <div id="toast" class="toast"></div>
 
     <script src="app.js"></script>
 </body>
