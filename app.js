@@ -1,5 +1,6 @@
 /**
- * 📅 График удалённой работы — Финальная исправленная версия
+ * 📅 График удалённой работы — Финальная версия
+ * Все исправления: автозагрузка календаря, автозагрузка файла, график удалёнки
  */
 
 let productionCalendar = {};
@@ -14,6 +15,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initEventListeners() {
+    const calSource = document.getElementById('calSource');
+    if (calSource) {
+        calSource.addEventListener('change', (e) => {
+            const htmlInput = document.getElementById('htmlInput');
+            if (htmlInput) htmlInput.classList.toggle('hidden', e.target.value !== 'html');
+        });
+    }
+    
     const dropZone = document.querySelector('.file-upload-label');
     if (dropZone) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -37,15 +46,7 @@ function handleDrop(e) {
     const fileInput = document.getElementById('dataFile');
     if (files.length > 0 && fileInput) {
         fileInput.files = files;
-        loadDataFile();
-    }
-}
-
-function toggleHtmlInput() {
-    const source = document.getElementById('calSource').value;
-    const htmlInput = document.getElementById('htmlInput');
-    if (htmlInput) {
-        htmlInput.classList.toggle('hidden', source !== 'html');
+        loadDataFile(); // Автозагрузка
     }
 }
 
@@ -76,7 +77,7 @@ function loadDataFromStorage() {
             }
             if (employees.length > 0 || absences.length > 0) {
                 renderDataPreview();
-                document.getElementById('remoteScheduleSection').style.display = 'block';
+                document.getElementById('remoteScheduleSection')?.classList.remove('hidden');
                 updateProgress(3);
             }
         }
@@ -115,7 +116,7 @@ async function loadCalendar() {
                 throw new Error('Вставьте полный HTML-код страницы (Ctrl+U → Ctrl+A → Ctrl+C)');
             }
         } else {
-            // Пробуем несколько прокси
+            // Пробуем разные прокси
             const proxyUrls = [
                 `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`,
                 `https://corsproxy.io/?${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`,
@@ -126,7 +127,7 @@ async function loadCalendar() {
             for (const proxyUrl of proxyUrls) {
                 try {
                     const controller = new AbortController();
-                    const timeout = setTimeout(() => controller.abort(), 15000);
+                    const timeout = setTimeout(() => controller.abort(), 10000);
                     
                     const res = await fetch(proxyUrl, { signal: controller.signal });
                     clearTimeout(timeout);
@@ -134,7 +135,7 @@ async function loadCalendar() {
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     html = await res.text();
                     
-                    if (html.includes('table') && (html.includes('cal') || html.includes('calendar'))) {
+                    if (html.includes('table') && html.includes('cal')) {
                         break;
                     }
                 } catch (e) {
@@ -144,7 +145,7 @@ async function loadCalendar() {
             }
             
             if (!html || !html.includes('table')) {
-                throw new Error('❌ Автозагрузка не удалась.<br><br><strong>Пожалуйста, используйте ручной режим:</strong><br>1. Откройте <a href="https://www.consultant.ru/law/ref/calendar/proizvodstvennye/' + year + '/" target="_blank" style="color: #007AFF;">consultant.ru</a><br>2. Нажмите <strong>Ctrl+U</strong> (просмотр кода)<br>3. Нажмите <strong>Ctrl+A</strong> (выделить всё)<br>4. Нажмите <strong>Ctrl+C</strong> (копировать)<br>5. Выберите "HTML код (вручную)" и вставьте код<br>6. Нажмите "Загрузить календарь"');
+                throw new Error('Автозагрузка не удалась. Пожалуйста:<br>1. Откройте <a href="https://www.consultant.ru/law/ref/calendar/proizvodstvennye/' + year + '/" target="_blank">consultant.ru</a><br>2. Нажмите Ctrl+U<br>3. Скопируйте весь код (Ctrl+A, Ctrl+C)<br>4. Выберите "HTML код (вручную)" и вставьте код<br>5. Нажмите "Загрузить календарь"');
             }
         }
         
@@ -159,7 +160,7 @@ async function loadCalendar() {
         updateProgress(2);
         
     } catch (e) {
-        showStatus(status, 'error', e.message);
+        showStatus(status, 'error', `❌ ${e.message}`);
         showToast('❌ Ошибка загрузки календаря', 'error');
     }
 }
@@ -255,7 +256,7 @@ function renderCalendarPreview(calendar, year) {
     }
 }
 
-// ==================== ШАГ 2: ДАННЫЕ ====================
+// ==================== ШАГ 2: ДАННЫЕ (АВТОЗАГРУЗКА) ====================
 async function loadDataFile() {
     const file = document.getElementById('dataFile')?.files[0];
     const status = document.getElementById('dataStatus');
@@ -298,7 +299,7 @@ async function loadDataFile() {
         renderDataPreview();
         
         // Показываем секцию графика удалёнки
-        document.getElementById('remoteScheduleSection').style.display = 'block';
+        document.getElementById('remoteScheduleSection')?.classList.remove('hidden');
         
         showStatus(status, 'success', `✅ Загружено: ${employees.length} сотрудников, ${absences.length} записей`);
         showToast(`✅ ${employees.length} сотрудников загружено`);
@@ -342,7 +343,7 @@ function renderDataPreview() {
     ).join('') || '<tr><td colspan="3" class="text-center">—</td></tr>';
 }
 
-// ==================== ГРАФИК УДАЛЁНКИ ====================
+// ==================== ГРАФИК УДАЛЁНКИ (как в макросе VBA) ====================
 function generateRemoteSchedule() {
     const month = parseInt(document.getElementById('remoteMonth')?.value || 1);
     const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
@@ -370,11 +371,13 @@ function generateRemoteSchedule() {
 }
 
 function generateRemoteLogic(year, month) {
+    // Логика из VBA макроса "Заполнить_График_Удалёнки()"
     const schedule = [];
     const firstDay = new Date(year, month-1, 1);
     const lastDay = new Date(year, month, 0);
     const dayNames = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
     
+    // Словари отсутствий
     const regularAbs = {};
     const remoteSick = {};
     
@@ -394,20 +397,27 @@ function generateRemoteLogic(year, month) {
         for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate()+1)) {
             const key = formatDateKey(d);
             
+            // Проверка: рабочий день по производственному календарю
             if (!productionCalendar[key]?.isWorking) continue;
             
+            // Проверка: сотрудник в отпуске/на обычном больничном (исключаем)
             const isRegularAbsent = regularAbs[emp.id]?.some(p => d >= p.start && d <= p.end);
             if (isRegularAbsent) continue;
             
+            // Проверка: больничный удаленно (добавляем даже если не день по графику)
             const isRemoteSick = remoteSick[emp.id]?.some(p => d >= p.start && d <= p.end);
+            
+            // Проверка: день по графику удалёнки
             const wd = dayNames[d.getDay()];
             const isPreferredDay = emp.remoteDays.some(pref => wd.includes(pref));
             
+            // Добавляем если: день по графику ИЛИ больничный удаленно
             if ((isPreferredDay && !isRemoteSick) || isRemoteSick) {
                 dates.push(new Date(d));
             }
         }
         
+        // Группировка последовательных дат (как в VBA)
         if (dates.length > 0) {
             const groups = groupDates(dates);
             groups.forEach(g => {
@@ -448,7 +458,7 @@ function groupDates(dates) {
 function showRemotePreview(schedule) {
     const preview = document.getElementById('remotePreview');
     if (!preview) return;
-    preview.style.display = 'block';
+    preview.classList.remove('hidden');
     
     let html = '<table class="data-table"><thead><tr>';
     html += '<th>Табельный номер</th><th>Специалист</th><th>Дата начала</th><th>Дата окончания</th></tr></thead><tbody>';
@@ -492,7 +502,7 @@ function downloadRemoteSchedule() {
     showToast('💾 Файл скачан');
 }
 
-// ==================== ШАГ 3: ГРАФИК ОТПУСКОВ (НАГЛЯДНЫЙ) ====================
+// ==================== ШАГ 3: ГРАФИК ОТПУСКОВ ====================
 function generateVacationChart() {
     const status = document.getElementById('chartStatus');
     const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
@@ -521,18 +531,17 @@ function renderVacationChart(year, period) {
     
     chart.classList.remove('hidden');
     
-    let daysToShow = 365;
-    let startDay = 0;
+    let monthsToShow = [];
     let monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
     
     switch(period) {
-        case 'H1': daysToShow = 181; startDay = 0; break;
-        case 'H2': daysToShow = 184; startDay = 181; break;
-        case 'Q1': daysToShow = 90; startDay = 0; break;
-        case 'Q2': daysToShow = 91; startDay = 90; break;
-        case 'Q3': daysToShow = 92; startDay = 181; break;
-        case 'Q4': daysToShow = 92; startDay = 273; break;
-        default: daysToShow = 365; startDay = 0;
+        case 'H1': monthsToShow = [0,1,2,3,4,5]; break;
+        case 'H2': monthsToShow = [6,7,8,9,10,11]; break;
+        case 'Q1': monthsToShow = [0,1,2]; break;
+        case 'Q2': monthsToShow = [3,4,5]; break;
+        case 'Q3': monthsToShow = [6,7,8]; break;
+        case 'Q4': monthsToShow = [9,10,11]; break;
+        default: monthsToShow = [0,1,2,3,4,5,6,7,8,9,10,11];
     }
     
     const empAbsences = {};
@@ -543,102 +552,73 @@ function renderVacationChart(year, period) {
         };
     });
     
+    // Добавляем сотрудников из отпусков
     absences.filter(a => a.start.getFullYear() === year).forEach(a => {
         if (!empAbsences[a.empId]) {
             empAbsences[a.empId] = { name: a.name || a.empId, periods: [] };
         }
-        if (!empAbsences[a.empId].periods.find(p => p.start.getTime() === a.start.getTime())) {
+        if (!empAbsences[a.empId].periods.find(p => p.start === a.start)) {
             empAbsences[a.empId].periods.push(a);
         }
     });
     
     const overlaps = findOverlaps(absences, year);
     
-    // Определяем выходные дни
-    const weekendDays = [];
-    for (let d = 0; d < daysToShow; d++) {
-        const date = new Date(year, 0, 1 + startDay + d);
-        const wd = date.getDay();
-        if (wd === 0 || wd === 6) weekendDays.push(d);
-    }
-    
     let html = '<div class="timeline-container">';
     
-    // Заголовок с днями
     html += '<div class="timeline-header">';
     html += '<div class="timeline-employee-col">Сотрудник</div>';
-    html += '<div class="timeline-days">';
-    
-    for (let d = 0; d < daysToShow; d++) {
-        const date = new Date(year, 0, 1 + startDay + d);
-        const dayNum = date.getDate();
-        const wd = date.getDay();
-        const isWeekend = wd === 0 || wd === 6;
-        const isMonthStart = dayNum === 1;
-        
-        let classes = 'timeline-day';
-        if (isWeekend) classes += ' weekend';
-        if (isMonthStart) classes += ' first-day-month';
-        
-        html += `<div class="${classes}" title="${formatDate(date)}">${dayNum}</div>`;
-    }
+    html += '<div class="timeline-months">';
+    monthsToShow.forEach(m => {
+        html += `<div class="timeline-month">${monthNames[m]}</div>`;
+    });
     html += '</div></div>';
     
-    // Строки сотрудников
     Object.keys(empAbsences).forEach(empId => {
         const emp = empAbsences[empId];
         if (emp.periods.length === 0) return;
         
         html += '<div class="timeline-row">';
-        html += `<div class="timeline-employee" title="${escapeHtml(emp.name)}">${escapeHtml(emp.name)}</div>`;
-        html += '<div class="timeline-days-row">';
+        html += `<div class="timeline-employee">${escapeHtml(emp.name)}</div>`;
+        html += '<div class="timeline-bars">';
         
-        // Фон выходных дней
-        weekendDays.forEach(d => {
-            html += `<div class="timeline-day-cell weekend" style="grid-column: ${d + 1};"></div>`;
-        });
-        
-        // Полосы отпусков
         emp.periods.forEach((period) => {
-            const periodStart = new Date(period.start);
-            const periodEnd = new Date(period.end);
-            const yearStart = new Date(year, 0, 1 + startDay);
-            const yearEnd = new Date(year, 0, 1 + startDay + daysToShow);
+            const startMonth = period.start.getMonth();
+            const endMonth = period.end.getMonth();
             
-            // Обрезаем период по границам отображения
-            const actualStart = periodStart < yearStart ? yearStart : periodStart;
-            const actualEnd = periodEnd > yearEnd ? yearEnd : periodEnd;
-            
-            if (actualStart > actualEnd) return;
-            
-            const startOffset = Math.floor((actualStart - yearStart) / (1000 * 60 * 60 * 24));
-            const endOffset = Math.floor((actualEnd - yearStart) / (1000 * 60 * 60 * 24));
-            const duration = endOffset - startOffset + 1;
-            
-            if (duration < 1) return;
-            
-            const isOverlap = overlaps.some(o => 
-                o.empId === empId && 
-                actualStart <= o.end && 
-                actualEnd >= o.start
-            );
-            
-            let className = 'vacation-bar';
-            if (isOverlap) className += ' overlap';
-            else if (period.type && period.type.includes('Больничный')) className += ' sick';
-            else if (period.type && !period.type.includes('Ежегодный')) className += ' other';
-            
-            const leftPercent = (startOffset / daysToShow) * 100;
-            const widthPercent = (duration / daysToShow) * 100;
-            
-            html += `<div class="${className}" style="left: ${leftPercent}%; width: ${widthPercent}%;">
-                <div class="bar-tooltip">
-                    <strong>${escapeHtml(emp.name)}</strong><br>
-                    ${period.type || 'Отпуск'}<br>
-                    ${formatDate(period.start)} – ${formatDate(period.end)}<br>
-                    ${period.days || Math.ceil((period.end-period.start)/86400000)+1} дн.
-                </div>
-            </div>`;
+            for (let m = startMonth; m <= endMonth; m++) {
+                if (!monthsToShow.includes(m)) continue;
+                
+                const isOverlap = overlaps.some(o => 
+                    o.empId === empId && 
+                    new Date(year, m, 1) >= o.start && 
+                    new Date(year, m, 1) <= o.end
+                );
+                
+                let className = 'vacation-bar';
+                if (isOverlap) className += ' overlap';
+                else if (period.type && period.type.includes('Больничный')) className += ' sick';
+                else if (period.type && !period.type.includes('Ежегодный')) className += ' other';
+                
+                const monthIndex = monthsToShow.indexOf(m);
+                const daysInMonth = new Date(year, m + 1, 0).getDate();
+                const startOffset = m === startMonth ? (period.start.getDate() - 1) / daysInMonth : 0;
+                const endOffset = m === endMonth ? (daysInMonth - period.end.getDate()) / daysInMonth : 0;
+                
+                const left = monthIndex * (100 / monthsToShow.length) + (startOffset * (100 / monthsToShow.length));
+                const width = ((100 / monthsToShow.length) * (1 - startOffset - endOffset));
+                
+                if (width > 2) {
+                    html += `<div class="${className}" style="left: ${left}%; width: ${width}%; position: absolute;">
+                        <div class="bar-tooltip">
+                            <strong>${escapeHtml(emp.name)}</strong><br>
+                            ${period.type || 'Отпуск'}<br>
+                            ${formatDate(period.start)} – ${formatDate(period.end)}<br>
+                            ${period.days || Math.ceil((period.end-period.start)/86400000)+1} дн.
+                        </div>
+                    </div>`;
+                }
+            }
         });
         
         html += '</div></div>';
@@ -667,6 +647,40 @@ function findOverlaps(absences, year) {
         }
     }
     return overlaps;
+}
+
+// ==================== ЭКСПОРТ ====================
+function downloadResults() {
+    if (absences.length === 0) { showToast('⚠️ Нет данных', 'error'); return; }
+    
+    const wb = XLSX.utils.book_new();
+    const year = document.getElementById('calYear')?.value || new Date().getFullYear();
+    
+    const absData = absences.map(a => ({
+        'Таб.№': a.empId, 'ФИО': a.name, 'Тип': a.type,
+        'Дата начала': formatDate(a.start), 'Дата окончания': formatDate(a.end), 'Дней': a.days
+    }));
+    const wsAbs = XLSX.utils.json_to_sheet(absData);
+    XLSX.utils.book_append_sheet(wb, wsAbs, 'Отпуска');
+    
+    const empData = employees.map(e => ({
+        'Табельный номер': e.id, 'Специалист': e.name, 'Дни удаленки': e.remoteDays.join(', ')
+    }));
+    const wsEmp = XLSX.utils.json_to_sheet(empData);
+    XLSX.utils.book_append_sheet(wb, wsEmp, 'Сотрудники');
+    
+    XLSX.writeFile(wb, `График_${year}.xlsx`);
+    showToast('💾 Файл скачан');
+}
+
+function exportDataJSON() {
+    const data = { employees, absences, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `calendar-data-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    showToast('📄 JSON экспортирован');
 }
 
 // ==================== УТИЛИТЫ ====================
@@ -698,8 +712,9 @@ function escapeHtml(t) { const div = document.createElement('div'); div.textCont
 
 window.loadCalendar = loadCalendar;
 window.loadDataFile = loadDataFile;
-window.toggleHtmlInput = toggleHtmlInput;
 window.generateRemoteSchedule = generateRemoteSchedule;
 window.downloadRemoteSchedule = downloadRemoteSchedule;
 window.generateVacationChart = generateVacationChart;
+window.downloadResults = downloadResults;
+window.exportDataJSON = exportDataJSON;
 window.clearAllData = clearAllData;
