@@ -8,12 +8,10 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Фоновые градиенты -->
     <div class="bg-gradient"></div>
     <div class="bg-gradient-2"></div>
     
     <div class="app-container">
-        <!-- Заголовок -->
         <header class="glass-card header">
             <div class="logo">
                 <span class="logo-icon">📅</span>
@@ -38,7 +36,7 @@
             <div class="progress-line"></div>
             <div class="progress-step" data-step="3">
                 <div class="step-number">3</div>
-                <span>Результат</span>
+                <span>График</span>
             </div>
         </div>
 
@@ -71,7 +69,7 @@
 
             <div id="htmlInput" class="html-input-wrapper hidden">
                 <label>HTML-код страницы</label>
-                <textarea id="htmlContent" rows="3" placeholder="Откройте consultant.ru → Ctrl+U → скопируйте код → вставьте сюда"></textarea>
+                <textarea id="htmlContent" rows="3" placeholder="Откройте consultant.ru → Ctrl+U → скопируйте код"></textarea>
             </div>
 
             <div class="button-group">
@@ -83,7 +81,6 @@
 
             <div id="calStatus" class="status-message"></div>
             
-            <!-- Превью календаря -->
             <div id="calendarPreview" class="calendar-preview hidden">
                 <div class="preview-header">
                     <h3>📆 Календарь <span id="previewYear"></span></h3>
@@ -97,7 +94,7 @@
         <section id="step2" class="glass-card step-content">
             <div class="step-header">
                 <span class="step-badge">Шаг 2</span>
-                <h2>📁 Данные сотрудников</h2>
+                <h2>📁 Загрузка данных сотрудников</h2>
             </div>
             
             <div class="info-card">
@@ -106,7 +103,7 @@
                     <h4>Формат файла Excel</h4>
                     <ul>
                         <li><strong>Лист «Сотрудники»:</strong> Табельный номер | Специалист | Дни удаленки</li>
-                        <li><strong>Лист «Отпуска»:</strong> Таб.№ | ФИО | Тип | Дата начала | Дата окончания</li>
+                        <li><strong>Лист «Отпуска и больничные»:</strong> Таб.№ | ФИО | Тип | Дата начала | Дата окончания</li>
                     </ul>
                 </div>
             </div>
@@ -116,7 +113,7 @@
                 <label for="dataFile" class="file-upload-label">
                     <div class="upload-icon">📤</div>
                     <div class="upload-text">
-                        <span class="upload-title">Нажмите для загрузки</span>
+                        <span class="upload-title">Нажмите для загрузки Excel-файла</span>
                         <span class="upload-subtitle">или перетащите файл сюда</span>
                     </div>
                     <div class="upload-hint">.xlsx, .xls до 10MB</div>
@@ -132,7 +129,6 @@
 
             <div id="dataStatus" class="status-message"></div>
 
-            <!-- Превью данных -->
             <div id="dataPreview" class="data-preview hidden">
                 <div class="preview-grid">
                     <div class="preview-card">
@@ -156,51 +152,44 @@
                         </div>
                         <div class="preview-table-wrapper">
                             <table class="preview-table">
-                                <thead><tr><th>Таб.№</th><th>Тип</th><th>Даты</th></tr></thead>
+                                <thead><tr><th>Таб.№</th><th>ФИО</th><th>Даты</th></tr></thead>
                                 <tbody id="previewAbsences"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Формирование графика -->
-            <div class="schedule-form">
-                <div class="form-field">
-                    <label>Месяц для графика</label>
-                    <div class="input-wrapper">
-                        <span class="input-icon">📊</span>
-                        <select id="remoteMonth">
-                            <option value="1">Январь</option><option value="2">Февраль</option>
-                            <option value="3">Март</option><option value="4">Апрель</option>
-                            <option value="5">Май</option><option value="6">Июнь</option>
-                            <option value="7">Июль</option><option value="8">Август</option>
-                            <option value="9">Сентябрь</option><option value="10">Октябрь</option>
-                            <option value="11">Ноябрь</option><option value="12">Декабрь</option>
-                        </select>
-                    </div>
-                </div>
-                <button onclick="generateRemoteSchedule()" class="btn btn-primary btn-lg btn-block">
-                    <span class="btn-icon">📋</span>
-                    <span>Сформировать график</span>
-                </button>
-            </div>
-
-            <div id="remoteStatus" class="status-message"></div>
-            <div id="remotePreview" class="result-table-wrapper hidden"></div>
         </section>
 
-        <!-- ШАГ 3: Результат -->
+        <!-- ШАГ 3: Визуальный график -->
         <section id="step3" class="glass-card step-content">
             <div class="step-header">
                 <span class="step-badge">Шаг 3</span>
-                <h2>📊 Визуальный календарь</h2>
+                <h2>📊 График отпусков с пересечениями</h2>
             </div>
             
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Период отображения</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">📅</span>
+                        <select id="viewPeriod">
+                            <option value="year">2026 год (полный)</option>
+                            <option value="H1">1 полугодие (янв-июн)</option>
+                            <option value="H2">2 полугодие (июл-дек)</option>
+                            <option value="Q1">1 квартал (янв-мар)</option>
+                            <option value="Q2">2 квартал (апр-июн)</option>
+                            <option value="Q3">3 квартал (июл-сен)</option>
+                            <option value="Q4">4 квартал (окт-дек)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <div class="button-group">
-                <button onclick="generateVisualCalendar()" class="btn btn-purple btn-lg">
+                <button onclick="generateVacationChart()" class="btn btn-purple btn-lg">
                     <span class="btn-icon">🎨</span>
-                    <span>Создать календарь</span>
+                    <span>Построить график</span>
                 </button>
                 <button onclick="downloadResults()" class="btn btn-primary btn-lg">
                     <span class="btn-icon">💾</span>
@@ -212,24 +201,20 @@
                 </button>
             </div>
 
-            <div id="visualStatus" class="status-message"></div>
-            <div id="visualPreview" class="result-table-wrapper hidden"></div>
+            <div id="chartStatus" class="status-message"></div>
             
-            <!-- Легенда -->
-            <div class="legend-card">
-                <h4>🎨 Условные обозначения</h4>
-                <div class="legend-grid">
-                    <div class="legend-item"><span class="legend-color absence-O"></span><span>Отпуск</span></div>
-                    <div class="legend-item"><span class="legend-color absence-Б"></span><span>Больничный</span></div>
-                    <div class="legend-item"><span class="legend-color absence-У"></span><span>Учебный</span></div>
-                    <div class="legend-item"><span class="legend-color absence-Д"></span><span>Декрет</span></div>
-                    <div class="legend-item"><span class="legend-color holiday"></span><span>Выходной</span></div>
-                    <div class="legend-item"><span class="legend-color overlap"></span><span>Пересечение</span></div>
+            <div id="vacationChart" class="vacation-chart hidden">
+                <div class="chart-header">
+                    <h3>📅 График отпусков сотрудников</h3>
+                    <div class="chart-legend">
+                        <div class="legend-item"><span class="legend-color vacation"></span>Отпуск</div>
+                        <div class="legend-item"><span class="legend-color overlap"></span>Пересечение</div>
+                    </div>
                 </div>
+                <div id="chartContent" class="chart-content"></div>
             </div>
         </section>
 
-        <!-- Футер -->
         <footer class="glass-card footer">
             <p>🔒 Данные обрабатываются локально в браузере</p>
             <button onclick="clearAllData()" class="btn-text btn-danger">
@@ -238,7 +223,6 @@
         </footer>
     </div>
 
-    <!-- Уведомления -->
     <div id="toast" class="toast hidden"></div>
 
     <script src="app.js"></script>
