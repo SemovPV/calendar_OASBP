@@ -1008,3 +1008,208 @@ textarea:focus {
 .file-input:not(:invalid) + .file-upload-label .upload-title {
     color: var(--success);
 }
+
+/* ==================== ГРАФИК ОТПУСКОВ ==================== */
+.vacation-chart {
+    margin-top: 24px;
+    background: white;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+}
+
+.chart-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.chart-legend {
+    display: flex;
+    gap: 20px;
+}
+
+.chart-content {
+    padding: 24px;
+    overflow-x: auto;
+}
+
+.timeline-container {
+    min-width: 100%;
+}
+
+.timeline-header {
+    display: flex;
+    border-bottom: 2px solid var(--gray-200);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: 13px;
+}
+
+.timeline-employee-col {
+    width: 200px;
+    flex-shrink: 0;
+    padding: 0 12px;
+}
+
+.timeline-months {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+}
+
+.timeline-month {
+    text-align: center;
+    padding: 4px;
+    background: var(--gray-100);
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.timeline-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.timeline-employee {
+    width: 200px;
+    flex-shrink: 0;
+    padding: 0 12px;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--gray-900);
+}
+
+.timeline-bars {
+    flex: 1;
+    position: relative;
+    height: 32px;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+}
+
+.vacation-bar {
+    position: relative;
+    background: linear-gradient(135deg, #92D050, #70AD47);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: white;
+    font-weight: 600;
+    overflow: hidden;
+}
+
+.vacation-bar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(146, 208, 80, 0.4);
+    z-index: 10;
+}
+
+.vacation-bar.overlap {
+    background: linear-gradient(135deg, #FF6464, #FF3B30);
+}
+
+.vacation-bar.sick {
+    background: linear-gradient(135deg, #FF9999, #FF6666);
+}
+
+.vacation-bar.other {
+    background: linear-gradient(135deg, #FFE699, #FFD966);
+    color: #333;
+}
+
+.bar-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--gray-900);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    margin-bottom: 8px;
+}
+
+.vacation-bar:hover .bar-tooltip {
+    opacity: 1;
+}
+
+.bar-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--gray-900);
+}
+
+.months-row {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.month-label {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-500);
+    padding: 4px;
+}
+
+/* Адаптив для графика */
+@media (max-width: 900px) {
+    .timeline-employee,
+    .timeline-employee-col {
+        width: 150px;
+        font-size: 12px;
+    }
+    
+    .chart-header {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+    }
+    
+    .chart-legend {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 640px) {
+    .timeline-months,
+    .timeline-bars {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    
+    .months-row {
+        grid-template-columns: repeat(6, 1fr);
+    }
+}
