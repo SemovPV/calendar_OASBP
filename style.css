@@ -5,6 +5,7 @@
     --warning: #FF9500;
     --danger: #FF3B30;
     --purple: #AF52DE;
+    --gray-50: #F9FAFB;
     --gray-100: #F2F2F7;
     --gray-200: #E5E5EA;
     --gray-300: #D1D1D6;
@@ -63,7 +64,7 @@ body {
 }
 
 .app-container {
-    max-width: 1000px;
+    max-width: 1100px;
     margin: 0 auto;
     padding: 20px;
     position: relative;
@@ -171,6 +172,19 @@ body {
 }
 
 .step-header h2 { font-size: 22px; font-weight: 600; color: var(--gray-900); }
+
+/* Alert */
+.alert-info {
+    background: rgba(0, 122, 255, 0.1);
+    border: 1px solid rgba(0, 122, 255, 0.3);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: var(--gray-700);
+}
+
+.alert-info strong { color: var(--primary); }
 
 /* Формы */
 .form-row {
@@ -393,7 +407,14 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     font-size: 18px;
     font-weight: 600;
     color: var(--gray-900);
+    margin-bottom: 8px;
+}
+
+.section-description {
+    font-size: 13px;
+    color: var(--gray-500);
     margin-bottom: 20px;
+    line-height: 1.6;
 }
 
 /* Таблицы результатов */
@@ -429,7 +450,7 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     background: var(--gray-50);
 }
 
-/* График отпусков - БОЛЕЕ НАГЛЯДНЫЙ */
+/* График отпусков - НАГЛЯДНЫЙ С ПРОКРУТКОЙ */
 .vacation-chart {
     margin-top: 24px;
     background: white;
@@ -460,9 +481,34 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     flex-wrap: wrap;
 }
 
-.chart-content {
-    padding: 24px;
+.chart-scroll-wrapper {
     overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    margin: 0;
+    padding: 0;
+}
+
+.chart-scroll-wrapper::-webkit-scrollbar {
+    height: 12px;
+}
+
+.chart-scroll-wrapper::-webkit-scrollbar-track {
+    background: var(--gray-100);
+}
+
+.chart-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: 6px;
+}
+
+.chart-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-500);
+}
+
+.chart-content {
+    min-width: 1400px;
+    padding: 24px;
 }
 
 .timeline-container {
@@ -477,6 +523,10 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     font-weight: 600;
     color: var(--gray-700);
     font-size: 14px;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
 }
 
 .timeline-employee-col {
@@ -484,31 +534,58 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     flex-shrink: 0;
     padding: 0 12px;
     font-weight: 600;
+    display: flex;
+    align-items: center;
 }
 
-.timeline-months {
+.timeline-days {
     flex: 1;
     display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(365, 1fr);
+    gap: 1px;
+    min-width: 1000px;
 }
 
-.timeline-month {
+.timeline-day {
     text-align: center;
-    padding: 8px 4px;
-    background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 6px 2px;
+    background: var(--gray-50);
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--gray-500);
+    border-left: 1px solid var(--gray-200);
+}
+
+.timeline-day.weekend {
+    background: #FFC7CE;
+    color: #9C0006;
+}
+
+.timeline-day.holiday {
+    background: #FFC7CE;
+    color: #9C0006;
     font-weight: 600;
-    color: var(--primary);
+}
+
+.timeline-day.first-day-month {
+    border-left: 2px solid var(--primary);
+}
+
+.month-divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--primary);
+    z-index: 5;
 }
 
 .timeline-row {
     display: flex;
     align-items: center;
-    padding: 16px 0;
+    padding: 12px 0;
     border-bottom: 1px solid var(--gray-100);
-    min-height: 60px;
+    min-height: 48px;
 }
 
 .timeline-employee {
@@ -516,60 +593,77 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     flex-shrink: 0;
     padding: 0 12px;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--gray-900);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.timeline-bars {
+.timeline-days-row {
     flex: 1;
     position: relative;
-    height: 40px;
+    height: 32px;
     display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(365, 1fr);
+    gap: 1px;
+    background: var(--gray-50);
+    border-radius: 6px;
+}
+
+.timeline-day-cell {
+    border-left: 1px solid var(--gray-200);
+    position: relative;
+}
+
+.timeline-day-cell.weekend {
+    background: rgba(255, 199, 206, 0.3);
 }
 
 .vacation-bar {
-    position: relative;
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
     background: linear-gradient(135deg, #92D050, #70AD47);
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.3s;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 10px;
     color: white;
     font-weight: 600;
     overflow: hidden;
-    min-width: 30px;
-    box-shadow: 0 2px 8px rgba(146, 208, 80, 0.4);
+    min-width: 20px;
+    box-shadow: 0 2px 6px rgba(146, 208, 80, 0.4);
+    z-index: 5;
 }
 
 .vacation-bar:hover {
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 6px 16px rgba(146, 208, 80, 0.6);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 12px rgba(146, 208, 80, 0.6);
     z-index: 10;
 }
 
 .vacation-bar.overlap {
     background: linear-gradient(135deg, #FF6464, #FF3B30);
-    box-shadow: 0 2px 8px rgba(255, 100, 100, 0.4);
+    box-shadow: 0 2px 6px rgba(255, 100, 100, 0.4);
 }
 
 .vacation-bar.overlap:hover {
-    box-shadow: 0 6px 16px rgba(255, 100, 100, 0.6);
+    box-shadow: 0 4px 12px rgba(255, 100, 100, 0.6);
 }
 
 .vacation-bar.sick {
     background: linear-gradient(135deg, #FF9999, #FF6666);
-    box-shadow: 0 2px 8px rgba(255, 153, 153, 0.4);
+    box-shadow: 0 2px 6px rgba(255, 153, 153, 0.4);
 }
 
 .vacation-bar.other {
     background: linear-gradient(135deg, #FFE699, #FFD966);
     color: #333;
-    box-shadow: 0 2px 8px rgba(255, 230, 153, 0.4);
+    box-shadow: 0 2px 6px rgba(255, 230, 153, 0.4);
 }
 
 .bar-tooltip {
@@ -581,14 +675,15 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     color: white;
     padding: 10px 14px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: 11px;
     white-space: nowrap;
     z-index: 100;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    max-width: 250px;
 }
 
 .vacation-bar:hover .bar-tooltip {
@@ -622,6 +717,15 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 .legend-color.vacation { background: #92D050; }
 .legend-color.overlap { background: #FF6464; }
 .legend-color.sick { background: #FF9999; }
+
+.chart-hint {
+    text-align: center;
+    padding: 12px;
+    background: var(--gray-50);
+    font-size: 12px;
+    color: var(--gray-500);
+    margin: 0;
+}
 
 /* Footer */
 .footer { text-align: center; padding: 24px; }
@@ -669,9 +773,9 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     .chart-header { flex-direction: column; text-align: center; }
     .chart-legend { justify-content: center; }
     .timeline-employee, .timeline-employee-col { width: 180px; font-size: 12px; }
-    .timeline-months, .timeline-bars { grid-template-columns: repeat(6, 1fr); gap: 4px; }
-    .timeline-month { font-size: 10px; padding: 4px 2px; }
-    .vacation-bar { font-size: 10px; min-width: 20px; }
+    .timeline-days, .timeline-days-row { grid-template-columns: repeat(180, 1fr); }
+    .chart-content { min-width: 900px; }
+    .vacation-bar { font-size: 9px; min-width: 15px; }
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
