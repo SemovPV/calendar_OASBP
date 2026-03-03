@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📅 Система управления графиками</title>
+    <title>📅 График удалёнки</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
@@ -11,26 +11,19 @@
 <body>
     <div class="container">
         
-        <!-- Заголовок -->
-        <header>
-            <h1>📅 Система управления графиками</h1>
-            <p>Аналог VBA-макросов для веб-браузера</p>
+        <header class="text-center mb-6">
+            <h1 class="text-2xl font-bold">📅 График удалённой работы</h1>
+            <p class="text-gray-600 text-sm">Загрузите данные → Сформируйте отчёт → Скачайте результат</p>
         </header>
 
-        <!-- Прогресс-бар шагов -->
+        <!-- Прогресс -->
         <div class="steps-container">
-            <div id="step1-indicator" class="step-indicator step-active">
-                <span>1. Календарь</span>
-            </div>
-            <div id="step2-indicator" class="step-indicator">
-                <span>2. Удалёнка</span>
-            </div>
-            <div id="step3-indicator" class="step-indicator">
-                <span>3. Визуальный</span>
-            </div>
+            <div id="step1-indicator" class="step-indicator step-active">1. Календарь</div>
+            <div id="step2-indicator" class="step-indicator">2. Данные</div>
+            <div id="step3-indicator" class="step-indicator">3. Результат</div>
         </div>
 
-        <!-- ==================== ШАГ 1: ПРОИЗВОДСТВЕННЫЙ КАЛЕНДАРЬ ==================== -->
+        <!-- ШАГ 1: Производственный календарь -->
         <section id="step1">
             <h2>📅 Шаг 1: Производственный календарь</h2>
             
@@ -40,207 +33,116 @@
                     <input type="number" id="calYear" value="2026" min="2020" max="2030">
                 </div>
                 <div class="form-group">
-                    <label>Способ загрузки</label>
+                    <label>Источник</label>
                     <select id="calSource">
-                        <option value="consultant">Consultant.ru (авто)</option>
-                        <option value="proxy">CORS-прокси</option>
+                        <option value="proxy">Consultant.ru (через прокси)</option>
                         <option value="html">HTML код (вручную)</option>
                     </select>
                 </div>
             </div>
 
-            <div id="htmlInput" class="form-group hidden mt-4">
-                <label>Вставьте HTML-код страницы consultant.ru</label>
-                <textarea id="htmlContent" rows="4" placeholder="Откройте страницу, нажмите Ctrl+U, скопируйте код и вставьте сюда"></textarea>
+            <div id="htmlInput" class="form-group hidden mt-3">
+                <label>HTML-код страницы consultant.ru</label>
+                <textarea id="htmlContent" rows="3" placeholder="Ctrl+U → Ctrl+A → Ctrl+C → вставьте сюда"></textarea>
             </div>
 
-            <div class="btn-group mt-4">
-                <button onclick="loadCalendar()" class="btn btn-primary">
-                    🔽 Загрузить календарь
-                </button>
-                <button onclick="toggleCalendarPreview()" class="btn btn-gray">
-                    👁️ Показать/скрыть календарь
-                </button>
-            </div>
+            <button onclick="loadCalendar()" class="btn btn-primary mt-4">
+                🔽 Загрузить календарь
+            </button>
 
             <div id="calStatus" class="status-box"></div>
             
-            <!-- Визуальное отображение календаря -->
-            <div id="calendarPreview" class="calendar-preview hidden mt-6">
-                <h3 class="font-bold mb-3">📆 Производственный календарь <span id="previewYear"></span></h3>
+            <!-- Превью календаря (всегда видно после загрузки) -->
+            <div id="calendarPreview" class="calendar-preview hidden">
+                <h3 class="font-bold mb-2">📆 Календарь <span id="previewYear"></span></h3>
                 <div id="calendarGrid" class="calendar-grid"></div>
             </div>
         </section>
 
-        <!-- ==================== ШАГ 2: ДАННЫЕ СОТРУДНИКОВ И ОТСУТСТВИЙ ==================== -->
+        <!-- ШАГ 2: Загрузка данных -->
         <section id="step2" class="disabled">
-            <h2>👥 Шаг 2: Данные сотрудников и отсутствий</h2>
+            <h2>📁 Шаг 2: Загрузка данных сотрудников</h2>
             
-            <!-- Вкладки -->
-            <div class="tabs mb-4">
-                <button class="tab-btn active" data-tab="employees">👤 Сотрудники</button>
-                <button class="tab-btn" data-tab="absences">🏖️ Отпуска и больничные</button>
-                <button class="tab-btn" data-tab="export">💾 Экспорт</button>
-                <button class="tab-btn" data-tab="sync">🔄 Синхронизация</button>
+            <div class="p-4 bg-blue-50 rounded-lg mb-4 text-sm">
+                <strong>📋 Формат файла Excel (.xlsx):</strong>
+                <ul class="list-disc list-inside mt-2 space-y-1">
+                    <li>Лист <strong>«Сотрудники»</strong>: Табельный номер | Специалист | Дни удаленки</li>
+                    <li>Лист <strong>«Отпуска и больничные»</strong>: Таб.№ | ФИО | Тип | Дата начала | Дата окончания</li>
+                </ul>
             </div>
 
-            <!-- Вкладка: Сотрудники -->
-            <div id="tab-employees" class="tab-content active">
-                <div class="form-grid mb-4">
-                    <div class="form-group">
-                        <label>Табельный номер *</label>
-                        <input type="text" id="empId" placeholder="145073">
-                    </div>
-                    <div class="form-group">
-                        <label>Специалист *</label>
-                        <input type="text" id="empName" placeholder="Степанова">
-                    </div>
-                    <div class="form-group">
-                        <label>Дни удалёнки *</label>
-                        <input type="text" id="empDays" placeholder="понедельник, вторник">
-                        <p class="form-help">Через запятую: понедельник, вторник, среда, четверг, пятница</p>
-                    </div>
-                </div>
-                <button onclick="addEmployee()" class="btn btn-success mb-4">➕ Добавить сотрудника</button>
-                
-                <div class="table-container visible">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Таб.№</th>
-                                <th>Специалист</th>
-                                <th>Дни удалёнки</th>
-                                <th>Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody id="employeesTable"></tbody>
-                    </table>
-                </div>
+            <div class="form-group">
+                <label>Выберите файл Excel</label>
+                <input type="file" id="dataFile" accept=".xlsx,.xls" class="w-full">
             </div>
 
-            <!-- Вкладка: Отпуска и больничные -->
-            <div id="tab-absences" class="tab-content">
-                <div class="form-grid mb-4">
-                    <div class="form-group">
-                        <label>Таб.№ *</label>
-                        <input type="text" id="absEmpId" placeholder="142056">
+            <button onclick="loadDataFile()" class="btn btn-success mt-4">
+                📥 Загрузить данные
+            </button>
+
+            <div id="dataStatus" class="status-box"></div>
+
+            <!-- Превью загруженных данных -->
+            <div id="dataPreview" class="mt-4 hidden">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="font-bold text-sm mb-2">👤 Сотрудники: <span id="empCount">0</span></h4>
+                        <div class="table-container visible max-h-40 overflow-y-auto">
+                            <table class="data-table text-xs">
+                                <thead><tr><th>Таб.№</th><th>Специалист</th><th>Дни</th></tr></thead>
+                                <tbody id="previewEmployees"></tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>ФИО</label>
-                        <input type="text" id="absName" placeholder="Белоусова К.П.">
+                    <div>
+                        <h4 class="font-bold text-sm mb-2">🏖️ Отпуска: <span id="absCount">0</span></h4>
+                        <div class="table-container visible max-h-40 overflow-y-auto">
+                            <table class="data-table text-xs">
+                                <thead><tr><th>Таб.№</th><th>Тип</th><th>Даты</th></tr></thead>
+                                <tbody id="previewAbsences"></tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Тип отсутствия</label>
-                        <select id="absType">
-                            <option value="Ежегодный отпуск">Ежегодный отпуск</option>
-                            <option value="Дополнительный отпуск">Дополнительный отпуск</option>
-                            <option value="Учебный отпуск">Учебный отпуск</option>
-                            <option value="Больничный">Больничный</option>
-                            <option value="Больничный удаленно">Больничный удаленно</option>
-                            <option value="Отпуск без сохранения ЗП">Отпуск без сохранения ЗП</option>
-                            <option value="Декретный отпуск">Декретный отпуск</option>
-                            <option value="По уходу за ребенком">По уходу за ребенком</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Дата начала *</label>
-                        <input type="date" id="absStart">
-                    </div>
-                    <div class="form-group">
-                        <label>Дата окончания *</label>
-                        <input type="date" id="absEnd">
-                    </div>
-                    <div class="form-group">
-                        <label>Примечание</label>
-                        <input type="text" id="absNote" placeholder="Комментарий">
-                    </div>
-                </div>
-                <button onclick="addAbsence()" class="btn btn-success mb-4">➕ Добавить запись</button>
-                
-                <div class="table-container visible">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Таб.№</th>
-                                <th>ФИО</th>
-                                <th>Тип</th>
-                                <th>Начало</th>
-                                <th>Конец</th>
-                                <th>Дней</th>
-                                <th>Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody id="absencesTable"></tbody>
-                    </table>
                 </div>
             </div>
 
-            <!-- Вкладка: Экспорт -->
-            <div id="tab-export" class="tab-content">
-                <div class="form-grid mb-4">
-                    <div class="form-group">
-                        <label>Месяц для графика</label>
-                        <select id="remoteMonth">
-                            <option value="1">Январь</option>
-                            <option value="2">Февраль</option>
-                            <option value="3">Март</option>
-                            <option value="4">Апрель</option>
-                            <option value="5">Май</option>
-                            <option value="6">Июнь</option>
-                            <option value="7">Июль</option>
-                            <option value="8">Август</option>
-                            <option value="9">Сентябрь</option>
-                            <option value="10">Октябрь</option>
-                            <option value="11">Ноябрь</option>
-                            <option value="12">Декабрь</option>
-                        </select>
-                    </div>
+            <!-- Формирование графика -->
+            <div class="form-grid mt-6 pt-4 border-t">
+                <div class="form-group">
+                    <label>Месяц для графика удалёнки</label>
+                    <select id="remoteMonth">
+                        <option value="1">Январь</option><option value="2">Февраль</option>
+                        <option value="3">Март</option><option value="4">Апрель</option>
+                        <option value="5">Май</option><option value="6">Июнь</option>
+                        <option value="7">Июль</option><option value="8">Август</option>
+                        <option value="9">Сентябрь</option><option value="10">Октябрь</option>
+                        <option value="11">Ноябрь</option><option value="12">Декабрь</option>
+                    </select>
                 </div>
-                <div class="btn-group">
-                    <button onclick="generateRemoteSchedule()" class="btn btn-success">
-                        📋 Сформировать график удалёнки
-                    </button>
-                    <button onclick="downloadRemoteSchedule()" class="btn btn-primary">
-                        💾 Скачать Excel (График удалёнки)
+                <div class="form-group flex items-end">
+                    <button onclick="generateRemoteSchedule()" class="btn btn-primary w-full">
+                        📋 Сформировать график
                     </button>
                 </div>
-                <div id="remoteStatus" class="status-box"></div>
-                <div id="remotePreview" class="table-container"></div>
             </div>
 
-            <!-- Вкладка: Синхронизация -->
-            <div id="tab-sync" class="tab-content">
-                <div class="p-4 bg-blue-50 rounded-lg mb-4">
-                    <p class="text-sm">📌 <strong>Важно:</strong> Данные сохраняются в браузере этого устройства. 
-                    Чтобы перенести их на другой компьютер или браузер, используйте экспорт/импорт JSON.</p>
-                </div>
-                <div class="btn-group">
-                    <button onclick="exportDataJSON()" class="btn btn-primary">
-                        📤 Экспорт данных (JSON)
-                    </button>
-                    <button onclick="document.getElementById('importFile').click()" class="btn btn-gray">
-                        📥 Импорт данных (JSON)
-                    </button>
-                    <input type="file" id="importFile" accept=".json" class="hidden" onchange="importDataJSON(this)">
-                </div>
-                <div class="mt-4">
-                    <button onclick="clearAllData()" class="btn btn-danger">
-                        🗑️ Очистить все данные
-                    </button>
-                </div>
-            </div>
+            <div id="remoteStatus" class="status-box"></div>
+            <div id="remotePreview" class="table-container"></div>
         </section>
 
-        <!-- ==================== ШАГ 3: ВИЗУАЛЬНЫЙ КАЛЕНДАРЬ ==================== -->
+        <!-- ШАГ 3: Результат -->
         <section id="step3" class="disabled">
-            <h2>📊 Шаг 3: Визуальный календарь на год</h2>
+            <h2>📊 Шаг 3: Визуальный календарь</h2>
             
-            <div class="btn-group mb-4">
+            <div class="btn-group">
                 <button onclick="generateVisualCalendar()" class="btn btn-purple">
                     🎨 Создать визуальный календарь
                 </button>
-                <button onclick="downloadVisualCalendar()" class="btn btn-primary">
-                    💾 Скачать Excel (Визуальный календарь)
+                <button onclick="downloadResults()" class="btn btn-primary">
+                    💾 Скачать результат (Excel)
+                </button>
+                <button onclick="exportDataJSON()" class="btn btn-gray">
+                    📄 Экспорт JSON
                 </button>
             </div>
 
@@ -248,29 +150,22 @@
             <div id="visualPreview" class="table-container"></div>
             
             <!-- Легенда -->
-            <div class="legend">
-                <h3>Условные обозначения:</h3>
-                <div class="legend-grid">
-                    <div class="legend-item"><span class="legend-color absence-O"></span>О — Отпуск</div>
-                    <div class="legend-item"><span class="legend-color absence-ДО"></span>ДО — Доп. отпуск</div>
-                    <div class="legend-item"><span class="legend-color absence-У"></span>У — Учебный</div>
-                    <div class="legend-item"><span class="legend-color absence-Б"></span>Б — Больничный</div>
-                    <div class="legend-item"><span class="legend-color absence-БУ"></span>БУ — Больничный удал.</div>
-                    <div class="legend-item"><span class="legend-color absence-БЗ"></span>БЗ — Без сохранения</div>
-                    <div class="legend-item"><span class="legend-color absence-Д"></span>Д — Декрет</div>
-                    <div class="legend-item"><span class="legend-color absence-УР"></span>УР — По уходу</div>
-                    <div class="legend-item"><span class="legend-color holiday"></span>Выходной/праздник</div>
-                    <div class="legend-item"><span class="legend-color overlap"></span>🔴 Пересечение</div>
+            <div class="legend mt-4">
+                <h4 class="font-bold text-sm mb-2">Условные обозначения:</h4>
+                <div class="legend-grid text-xs">
+                    <span class="legend-item"><span class="legend-color absence-O"></span>О</span>
+                    <span class="legend-item"><span class="legend-color absence-Б"></span>Б</span>
+                    <span class="legend-item"><span class="legend-color absence-У"></span>У</span>
+                    <span class="legend-item"><span class="legend-color absence-Д"></span>Д</span>
+                    <span class="legend-item"><span class="legend-color holiday"></span>Выходной</span>
+                    <span class="legend-item"><span class="legend-color overlap"></span>🔴</span>
                 </div>
             </div>
         </section>
 
-        <!-- Футер -->
-        <footer>
-            <p>Создано на основе VBA-макросов • Работает в браузере • Данные хранятся локально</p>
-            <p class="mt-2 text-xs text-gray-500">
-                💡 Совет: Экспортируйте данные в JSON перед сменой устройства
-            </p>
+        <footer class="text-center text-gray-500 text-xs mt-8">
+            <p>Данные обрабатываются в браузере • Не отправляются на сервер</p>
+            <button onclick="clearAllData()" class="text-red-500 hover:underline mt-2">🗑️ Очистить данные</button>
         </footer>
     </div>
 
