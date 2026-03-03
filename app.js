@@ -1,22 +1,37 @@
 /**
- * 📅 Система управления графиками
- * Аналог VBA-макросов для веб-браузера
- * 
- * Глобальные данные хранятся в памяти браузера
+ * 📅 Система управления графиками — Обновлённая версия
+ * С формами, визуальным календарём и синхронизацией
  */
 
 // ==================== ГЛОБАЛЬНЫЕ ДАННЫЕ ====================
-let productionCalendar = {};      // { "2026-01-01": {isWorking, isHoliday, isPreHoliday} }
-let employees = [];               // [{id, name, remoteDays: []}]
-let absences = [];                // [{empId, type, start, end}]
-let remoteSchedule = [];          // Результаты графика удалёнки
-let visualCalendarData = [];      // Результаты визуального календаря
+let productionCalendar = {};
+let employees = [];
+let absences = [];
+let remoteSchedule = [];
+let visualCalendarData = [];
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
 document.addEventListener('DOMContentLoaded', () => {
+    initTabs();
     initEventListeners();
-    loadFromLocalStorage();
+    loadDataFromStorage();
+    renderEmployeesTable();
+    renderAbsencesTable();
 });
+
+function initTabs() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Убираем активный класс у всех
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            // Добавляем к текущему
+            btn.classList.add('active');
+            document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+        });
+    });
+}
 
 function initEventListeners() {
     // Переключение источника календаря
@@ -32,22 +47,22 @@ function initEventListeners() {
 }
 
 // ==================== LOCAL STORAGE ====================
-function saveToLocalStorage() {
+function saveDataToStorage() {
     try {
-        localStorage.setItem('calendarData', JSON.stringify({
+        localStorage.setItem('calendarSystemData', JSON.stringify({
             productionCalendar,
             employees,
             absences,
             calYear: document.getElementById('calYear')?.value
         }));
     } catch (e) {
-        console.warn('Не удалось сохранить в LocalStorage:', e);
+        console.warn('Не удалось сохранить данные:', e);
     }
 }
 
-function loadFromLocalStorage() {
+function loadDataFromStorage() {
     try {
-        const saved = localStorage.getItem('calendarData');
+        const saved = localStorage.getItem('calendarSystemData');
         if (saved) {
             const data = JSON.parse(saved);
             productionCalendar = data.productionCalendar || {};
@@ -58,47 +73,116 @@ function loadFromLocalStorage() {
             }
         }
     } catch (e) {
-        console.warn('Не удалось загрузить из LocalStorage:', e);
+        console.warn('Не удалось загрузить данные:', e);
     }
 }
 
-function clearLocalStorage() {
-    localStorage.removeItem('calendarData');
+function exportDataJSON() {
+    const data = {
+        employees,
+        absences,
+        exportedAt: new Date().toISOString(),
+        version: '1.0'
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `calendar-data-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importDataJSON(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.employees) employees = data.employees;
+            if (data.absences) absences = data.absences;
+            
+            saveDataToStorage();
+            renderEmployeesTable();
+            renderAbsencesTable();
+            
+            alert('✅ Данные успешно импортированы!');
+        } catch (err) {
+            alert('❌ Ошибка при импорте: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    input.value = ''; // Сброс для повторного выбора
+}
+
+function clearAllData() {
+    if (confirm('⚠️ Вы уверены? Все данные будут удалены!')) {
+        localStorage.removeItem('calendarSystemData');
+        employees = [];
+        absences = [];
+        productionCalendar = {};
+        renderEmployeesTable();
+        renderAbsencesTable();
+        alert('🗑️ Данные очищены');
+    }
 }
 
 // ==================== ШАГ 1: КАЛЕНДАРЬ ====================
 async function loadCalendar() {
-    const year = document.getElementById('calYear')?.value || new Date().getFullYear();
-    const source = document.getElementById('calSource')?.value || 'api';
+    const year = document.getElementById('calYear').value || new Date().getFullYear();
+    const source = document.getElementById('calSource').value;
     const status = document.getElementById('calStatus');
-    
-    if (!status) return;
     
     showStatus(status, 'loading', '⏳ Загрузка календаря...');
 
     try {
-        if (source === 'html') {
-            const html = document.getElementById('htmlContent')?.value || '';
-            if (!html.trim()) throw new Error('Вставьте HTML-код страницы');
-            productionCalendar = parseCalendarFromHTML(html, year);
-        } else if (source === 'file') {
-            const fileInput = document.getElementById('calFile');
-            const file = fileInput?.files[0];
-            if (!file) throw new Error('Выберите файл');
-            productionCalendar = await parseCalendarFromFile(file, year);
-        } else {
-            productionCalendar = await fetchCalendarFromAPI(year);
-        }
-
-        const workingDays = Object.values(productionCalendar).filter(d => d.isWorking).length;
-        showStatus(status, 'success', `✅ Календарь загружен! Рабочих дней: ${workingDays}`);
+        let html = '';
         
-        // Сохраняем и активируем следующий шаг
-        saveToLocalStorage();
+        if (source === 'consultant') {
+            // Прямой запрос (может не сработать из-за CORS)
+            try {
+                const response = await fetch(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`, {
+                    mode: 'cors'
+                });
+                if (response.ok) {
+                    html = await response.text();
+                }
+            } catch (e) {
+                console.log('Прямой запрос не удался, пробуем прокси...');
+            }
+        }
+        
+        if (source === 'proxy' || !html) {
+            // Попытка через CORS-прокси
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`;
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+                html = await response.text();
+            }
+        }
+        
+        if (source === 'html' || !html) {
+            // Ручной ввод
+            html = document.getElementById('htmlContent').value;
+            if (!html.trim()) throw new Error('Вставьте HTML-код или выберите другой способ загрузки');
+        }
+        
+        if (!html) throw new Error('Не удалось загрузить календарь. Попробуйте способ "HTML код"');
+        
+        productionCalendar = parseCalendarFromHTML(html, year);
+        
+        // Показываем визуальный календарь
+        renderCalendarPreview(productionCalendar, year);
+        
+        showStatus(status, 'success', `✅ Календарь загружен! Рабочих дней: ${Object.values(productionCalendar).filter(d => d.isWorking).length}`);
+        saveDataToStorage();
         activateStep(2);
         
     } catch (e) {
-        showStatus(status, 'error', `❌ Ошибка: ${e.message}`);
+        showStatus(status, 'error', `❌ Ошибка: ${e.message}<br><small>💡 Попробуйте: 1) Откройте consultant.ru в другом окне 2) Ctrl+U 3) Скопируйте код 4) Вставьте в поле "HTML код"</small>`);
         console.error(e);
     }
 }
@@ -108,7 +192,6 @@ function parseCalendarFromHTML(html, year) {
     const doc = parser.parseFromString(html, 'text/html');
     const tables = doc.querySelectorAll('table.cal');
     const calendar = {};
-    
     const monthNames = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
                        'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
 
@@ -126,20 +209,15 @@ function parseCalendarFromHTML(html, year) {
             const cells = row.querySelectorAll('td');
             cells.forEach(cell => {
                 let dayText = cell.innerText.trim().replace('*', '');
-                if (dayText && !isNaN(dayText)) {
+                if (dayText && !isNaN(dayText) && currentMonth) {
                     const day = parseInt(dayText);
-                    if (!currentMonth) return;
-                    
                     const dateKey = `${year}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     const className = cell.className || '';
                     
-                    const isHoliday = className.includes('weekend') || className.includes('holiday');
-                    const isPreHoliday = className.includes('preholiday');
-                    
                     calendar[dateKey] = {
-                        isWorking: !isHoliday,
-                        isHoliday,
-                        isPreHoliday,
+                        isWorking: !className.includes('weekend') && !className.includes('holiday'),
+                        isHoliday: className.includes('weekend') || className.includes('holiday'),
+                        isPreHoliday: className.includes('preholiday'),
                         day,
                         month: currentMonth
                     };
@@ -148,7 +226,6 @@ function parseCalendarFromHTML(html, year) {
         });
     });
 
-    // Дополняем недостающие дни
     fillMissingDays(calendar, year);
     return calendar;
 }
@@ -173,122 +250,225 @@ function fillMissingDays(calendar, year) {
     }
 }
 
-async function parseCalendarFromFile(file, year) {
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(sheet, {header: 1});
+function renderCalendarPreview(calendar, year) {
+    const grid = document.getElementById('calendarGrid');
+    const preview = document.getElementById('calendarPreview');
+    const previewYear = document.getElementById('previewYear');
     
-    const calendar = {};
-    // Парсинг Excel-календаря (упрощённая версия)
-    fillMissingDays(calendar, year);
-    return calendar;
-}
-
-async function fetchCalendarFromAPI(year) {
-    // Fallback: генерируем календарь по стандартным правилам
-    const calendar = {};
-    for (let m = 1; m <= 12; m++) {
-        const daysInMonth = new Date(year, m, 0).getDate();
-        for (let d = 1; d <= daysInMonth; d++) {
-            const dateKey = `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const date = new Date(year, m - 1, d);
-            const weekday = date.getDay();
-            calendar[dateKey] = {
-                isWorking: weekday !== 0 && weekday !== 6,
-                isHoliday: weekday === 0 || weekday === 6,
-                isPreHoliday: false,
-                day: d,
-                month: m
-            };
+    if (!grid || !preview) return;
+    
+    previewYear.textContent = year;
+    grid.innerHTML = '';
+    
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                       'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    
+    for (let month = 1; month <= 12; month++) {
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const firstDay = new Date(year, month - 1, 1);
+        const startWeekday = (firstDay.getDay() + 6) % 7; // Пн=0
+        
+        const monthEl = document.createElement('div');
+        monthEl.className = 'calendar-month';
+        
+        let html = `<div class="calendar-month-header">${monthNames[month-1]} ${year}</div>`;
+        html += '<div class="calendar-weekdays">';
+        weekdays.forEach(d => { html += `<div>${d}</div>`; });
+        html += '</div><div class="calendar-days">';
+        
+        // Пустые ячейки до первого дня месяца
+        for (let i = 0; i < startWeekday; i++) {
+            html += '<div class="calendar-day empty"></div>';
         }
+        
+        // Дни месяца
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayData = calendar[dateKey];
+            const classes = ['calendar-day'];
+            
+            if (dayData?.isHoliday) classes.push('holiday');
+            if (dayData?.isPreHoliday) classes.push('preholiday');
+            
+            html += `<div class="${classes.join(' ')}">${day}${dayData?.isPreHoliday ? '*' : ''}</div>`;
+        }
+        
+        html += '</div>';
+        monthEl.innerHTML = html;
+        grid.appendChild(monthEl);
     }
-    return calendar;
 }
 
-// ==================== ШАГ 2: ГРАФИК УДАЛЁНКИ ====================
+function toggleCalendarPreview() {
+    const preview = document.getElementById('calendarPreview');
+    if (preview) {
+        preview.classList.toggle('hidden');
+    }
+}
+
+// ==================== ШАГ 2: ФОРМЫ ====================
+// --- Сотрудники ---
+function addEmployee() {
+    const id = document.getElementById('empId')?.value?.trim();
+    const name = document.getElementById('empName')?.value?.trim();
+    const days = document.getElementById('empDays')?.value?.trim();
+    
+    if (!id || !name || !days) {
+        alert('⚠️ Заполните все обязательные поля');
+        return;
+    }
+    
+    // Проверяем дубликаты
+    if (employees.find(e => e.id === id)) {
+        if (!confirm(`Сотрудник с таб.№ ${id} уже существует. Обновить?`)) return;
+        employees = employees.filter(e => e.id !== id);
+    }
+    
+    employees.push({
+        id,
+        name,
+        remoteDays: days.toLowerCase().split(',').map(d => d.trim()).filter(d => d)
+    });
+    
+    saveDataToStorage();
+    renderEmployeesTable();
+    
+    // Очистка формы
+    document.getElementById('empId').value = '';
+    document.getElementById('empName').value = '';
+    document.getElementById('empDays').value = '';
+}
+
+function removeEmployee(id) {
+    if (confirm('Удалить сотрудника?')) {
+        employees = employees.filter(e => e.id !== id);
+        saveDataToStorage();
+        renderEmployeesTable();
+    }
+}
+
+function renderEmployeesTable() {
+    const tbody = document.getElementById('employeesTable');
+    if (!tbody) return;
+    
+    if (employees.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-4">Нет сотрудников. Добавьте первого 👆</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = employees.map(emp => `
+        <tr>
+            <td>${escapeHtml(emp.id)}</td>
+            <td>${escapeHtml(emp.name)}</td>
+            <td>${escapeHtml(emp.remoteDays.join(', '))}</td>
+            <td>
+                <button class="action-btn delete" onclick="removeEmployee('${emp.id}')">✕</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// --- Отпуска и больничные ---
+function addAbsence() {
+    const empId = document.getElementById('absEmpId')?.value?.trim();
+    const name = document.getElementById('absName')?.value?.trim();
+    const type = document.getElementById('absType')?.value;
+    const start = document.getElementById('absStart')?.value;
+    const end = document.getElementById('absEnd')?.value;
+    const note = document.getElementById('absNote')?.value?.trim();
+    
+    if (!empId || !type || !start || !end) {
+        alert('⚠️ Заполните обязательные поля: Таб.№, Тип, Даты');
+        return;
+    }
+    
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const daysCount = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    
+    absences.push({
+        empId,
+        name,
+        type,
+        start: startDate,
+        end: endDate,
+        days: daysCount,
+        note: note || ''
+    });
+    
+    saveDataToStorage();
+    renderAbsencesTable();
+    
+    // Очистка формы
+    document.getElementById('absName').value = '';
+    document.getElementById('absStart').value = '';
+    document.getElementById('absEnd').value = '';
+    document.getElementById('absNote').value = '';
+}
+
+function removeAbsence(index) {
+    if (confirm('Удалить запись?')) {
+        absences.splice(index, 1);
+        saveDataToStorage();
+        renderAbsencesTable();
+    }
+}
+
+function renderAbsencesTable() {
+    const tbody = document.getElementById('absencesTable');
+    if (!tbody) return;
+    
+    if (absences.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500 py-4">Нет записей об отсутствиях</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = absences.map((abs, idx) => `
+        <tr>
+            <td>${escapeHtml(abs.empId)}</td>
+            <td>${escapeHtml(abs.name || '—')}</td>
+            <td>${escapeHtml(abs.type)}</td>
+            <td>${formatDate(abs.start)}</td>
+            <td>${formatDate(abs.end)}</td>
+            <td>${abs.days}</td>
+            <td>
+                <button class="action-btn delete" onclick="removeAbsence(${idx})">✕</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// --- Экспорт графика удалёнки ---
 async function generateRemoteSchedule() {
-    const empFile = document.getElementById('empFile')?.files[0];
-    const absFile = document.getElementById('absFile')?.files[0];
     const month = parseInt(document.getElementById('remoteMonth')?.value || 1);
     const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
     const status = document.getElementById('remoteStatus');
-
-    if (!status) return;
     
-    showStatus(status, 'loading', '⏳ Обработка данных...');
+    if (Object.keys(productionCalendar).length === 0) {
+        showStatus(status, 'error', '⚠️ Сначала загрузите производственный календарь (Шаг 1)');
+        return;
+    }
+    
+    showStatus(status, 'loading', '⏳ Формирование графика...');
 
     try {
-        if (empFile) {
-            employees = await parseEmployeesFile(empFile);
-        }
-
-        if (absFile) {
-            absences = await parseAbsencesFile(absFile);
-        }
-
         remoteSchedule = generateRemoteScheduleLogic(year, month);
-
+        
         showStatus(status, 'success', `✅ Готово! Записей: ${remoteSchedule.length}`);
         showRemotePreview(remoteSchedule);
-        saveToLocalStorage();
         activateStep(3);
-
+        
     } catch (e) {
         showStatus(status, 'error', `❌ Ошибка: ${e.message}`);
         console.error(e);
     }
 }
 
-async function parseEmployeesFile(file) {
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
-    
-    return json.map(row => ({
-        id: String(row['ID'] || row['id'] || row['Табельный номер'] || ''),
-        name: String(row['ФИО'] || row['name'] || row['Сотрудник'] || ''),
-        remoteDays: String(row['Дни удалёнки'] || row['remoteDays'] || '')
-            .toLowerCase()
-            .split(',')
-            .map(d => d.trim())
-            .filter(d => d)
-    }));
-}
-
-async function parseAbsencesFile(file) {
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
-    
-    return json.map(row => ({
-        empId: String(row['ID'] || row['id'] || row['Сотрудник ID'] || row['Табельный номер'] || ''),
-        type: String(row['Тип'] || row['type'] || row['Вид отсутствия'] || ''),
-        start: parseExcelDate(row['Начало'] || row['start'] || row['Дата начала']),
-        end: parseExcelDate(row['Конец'] || row['end'] || row['Дата окончания'])
-    }));
-}
-
-function parseExcelDate(value) {
-    if (value instanceof Date) return value;
-    if (typeof value === 'number') {
-        return new Date(Math.round((value - 25569) * 86400 * 1000));
-    }
-    if (typeof value === 'string') {
-        const parsed = new Date(value);
-        if (!isNaN(parsed.getTime())) return parsed;
-    }
-    return new Date();
-}
-
 function generateRemoteScheduleLogic(year, month) {
     const schedule = [];
     const firstDay = new Date(year, month - 1, 1);
     const lastDay = new Date(year, month, 0);
-    
     const dayNames = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
     
     const regularAbsences = {};
@@ -296,7 +476,7 @@ function generateRemoteScheduleLogic(year, month) {
     
     absences.forEach(abs => {
         if (!regularAbsences[abs.empId]) regularAbsences[abs.empId] = [];
-        if (abs.type === 'Больничный удаленно' || abs.type === 'БУ') {
+        if (abs.type === 'Больничный удаленно') {
             if (!remoteSickDays[abs.empId]) remoteSickDays[abs.empId] = [];
             remoteSickDays[abs.empId].push({start: abs.start, end: abs.end});
         } else {
@@ -314,15 +494,10 @@ function generateRemoteScheduleLogic(year, month) {
             
             if (!productionCalendar[dateKey]?.isWorking) continue;
             
-            const isRegularAbsent = regularAbsences[emp.id]?.some(period => 
-                d >= period.start && d <= period.end
-            );
+            const isRegularAbsent = regularAbsences[emp.id]?.some(p => d >= p.start && d <= p.end);
             if (isRegularAbsent) continue;
             
-            const isRemoteSick = remoteSickDays[emp.id]?.some(period => 
-                d >= period.start && d <= period.end
-            );
-            
+            const isRemoteSick = remoteSickDays[emp.id]?.some(p => d >= p.start && d <= p.end);
             const isPreferredDay = emp.remoteDays.some(pref => dayName.includes(pref));
             
             if ((isPreferredDay && !isRemoteSick) || isRemoteSick) {
@@ -348,21 +523,19 @@ function generateRemoteScheduleLogic(year, month) {
 
 function groupConsecutiveDates(dates) {
     if (dates.length === 0) return [];
-    
     const groups = [];
-    let start = new Date(dates[0]);
-    let end = new Date(dates[0]);
+    let start = new Date(dates[0]), end = new Date(dates[0]);
     
     for (let i = 1; i < dates.length; i++) {
-        const nextDay = new Date(dates[i]);
-        const expectedNext = new Date(end);
-        expectedNext.setDate(expectedNext.getDate() + 1);
+        const next = new Date(dates[i]);
+        const expected = new Date(end);
+        expected.setDate(expected.getDate() + 1);
         
-        if (nextDay.getTime() === expectedNext.getTime()) {
-            end = nextDay;
+        if (next.getTime() === expected.getTime()) {
+            end = next;
         } else {
             groups.push({start: new Date(start), end: new Date(end)});
-            start = end = nextDay;
+            start = end = next;
         }
     }
     groups.push({start: new Date(start), end: new Date(end)});
@@ -377,7 +550,7 @@ function showRemotePreview(schedule) {
     preview.classList.add('visible');
     
     let html = '<table class="data-table"><thead><tr>';
-    html += '<th>ID</th><th>Сотрудник</th><th>Начало</th><th>Конец</th></tr></thead><tbody>';
+    html += '<th>Таб.№</th><th>Специалист</th><th>Дата начала</th><th>Дата окончания</th></tr></thead><tbody>';
     
     schedule.forEach(row => {
         html += `<tr>
@@ -392,18 +565,48 @@ function showRemotePreview(schedule) {
     preview.innerHTML = html;
 }
 
+function downloadRemoteSchedule() {
+    if (remoteSchedule.length === 0) {
+        alert('⚠️ Сначала сформируйте график (кнопка "Сформировать график удалёнки")');
+        return;
+    }
+    
+    const year = document.getElementById('calYear')?.value || new Date().getFullYear();
+    const month = document.getElementById('remoteMonth')?.value || 1;
+    const monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    
+    const data = remoteSchedule.map(r => ({
+        'Табельный номер': r.empId,
+        'Дата начала (дд.мм.гггг)': formatDate(r.start),
+        'Дата окончания (дд.мм.гггг)': formatDate(r.end),
+        'Специалист': r.empName
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Настройка ширины колонок
+    ws['!cols'] = [{wch: 12}, {wch: 15}, {wch: 15}, {wch: 25}];
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `График удалёнки ${monthNames[month-1]} ${year}`);
+    
+    XLSX.writeFile(wb, `График_удалёнки_${monthNames[month-1]}_${year}.xlsx`);
+}
+
 // ==================== ШАГ 3: ВИЗУАЛЬНЫЙ КАЛЕНДАРЬ ====================
 function generateVisualCalendar() {
     const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
     const status = document.getElementById('visualStatus');
     
-    if (!status) return;
+    if (Object.keys(productionCalendar).length === 0) {
+        showStatus(status, 'error', '⚠️ Сначала загрузите производственный календарь (Шаг 1)');
+        return;
+    }
     
     showStatus(status, 'loading', '⏳ Генерация визуального календаря...');
 
     try {
         visualCalendarData = generateVisualCalendarLogic(year);
-        
         showStatus(status, 'success', `✅ Готово! Сотрудников: ${visualCalendarData.length}`);
         showVisualPreview(visualCalendarData, year);
         
@@ -415,39 +618,31 @@ function generateVisualCalendar() {
 
 function generateVisualCalendarLogic(year) {
     const result = [];
-    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-                       'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-    
+    const monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
     const absenceMap = {};
     
     absences.forEach(abs => {
-        if (abs.type === 'Больничный удаленно' || abs.type === 'БУ') return;
+        if (abs.type === 'Больничный удаленно') return;
         if (abs.start.getFullYear() !== year) return;
         
         if (!absenceMap[abs.empId]) {
             const emp = employees.find(e => e.id === abs.empId);
             absenceMap[abs.empId] = {
-                name: emp ? emp.name : abs.empId,
+                name: emp ? emp.name : (abs.name || abs.empId),
                 periods: [],
                 totalDays: 0
             };
         }
         
         absenceMap[abs.empId].periods.push(abs);
-        
-        if (abs.type !== 'Больничный' && abs.type !== 'Б') {
-            const days = Math.ceil((abs.end - abs.start) / (1000 * 60 * 60 * 24)) + 1;
-            absenceMap[abs.empId].totalDays += days;
+        if (!abs.type.includes('Больничный')) {
+            absenceMap[abs.empId].totalDays += abs.days;
         }
     });
 
     employees.forEach(emp => {
         if (!absenceMap[emp.id]) {
-            absenceMap[emp.id] = {
-                name: emp.name,
-                periods: [],
-                totalDays: 0
-            };
+            absenceMap[emp.id] = { name: emp.name, periods: [], totalDays: 0 };
         }
     });
 
@@ -474,57 +669,41 @@ function generateVisualCalendarLogic(year) {
                     }
                 }
             });
-            
             months.push({ name: monthNames[m - 1], days: monthData });
         }
         
-        result.push({
-            empId,
-            name: empData.name,
-            totalDays: empData.totalDays,
-            months
-        });
+        result.push({ empId, name: empData.name, totalDays: empData.totalDays, months });
     });
     
     return result;
 }
 
 function detectOverlaps(absences, year) {
-    const overlapMap = {};
-    
+    const map = {};
     for (let i = 0; i < absences.length; i++) {
         for (let j = i + 1; j < absences.length; j++) {
-            const a1 = absences[i];
-            const a2 = absences[j];
-            
-            if (a1.empId === a2.empId) continue;
-            if (a1.start.getFullYear() !== year) continue;
+            const a1 = absences[i], a2 = absences[j];
+            if (a1.empId === a2.empId || a1.start.getFullYear() !== year) continue;
             
             const maxStart = new Date(Math.max(a1.start, a2.start));
             const minEnd = new Date(Math.min(a1.end, a2.end));
             
             if (maxStart <= minEnd) {
                 for (let d = new Date(maxStart); d <= minEnd; d.setDate(d.getDate() + 1)) {
-                    overlapMap[`${a1.empId}-${formatDateKey(d)}`] = true;
-                    overlapMap[`${a2.empId}-${formatDateKey(d)}`] = true;
+                    map[`${a1.empId}-${formatDateKey(d)}`] = true;
+                    map[`${a2.empId}-${formatDateKey(d)}`] = true;
                 }
             }
         }
     }
-    
-    return overlapMap;
+    return map;
 }
 
 function getAbsenceCode(type) {
     const codes = {
-        'Ежегодный отпуск': 'О',
-        'Дополнительный отпуск': 'ДО',
-        'Учебный отпуск': 'У',
-        'Больничный': 'Б',
-        'Больничный удаленно': 'БУ',
-        'Отпуск без сохранения ЗП': 'БЗ',
-        'Декретный отпуск': 'Д',
-        'По уходу за ребенком': 'УР'
+        'Ежегодный отпуск': 'О', 'Дополнительный отпуск': 'ДО', 'Учебный отпуск': 'У',
+        'Больничный': 'Б', 'Больничный удаленно': 'БУ', 'Отпуск без сохранения ЗП': 'БЗ',
+        'Декретный отпуск': 'Д', 'По уходу за ребенком': 'УР'
     };
     return codes[type] || 'X';
 }
@@ -536,32 +715,26 @@ function showVisualPreview(data, year) {
     preview.classList.remove('hidden');
     preview.classList.add('visible');
     
-    const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн',
-                       'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+    const monthShort = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
     
     let html = '<div class="overflow-x-auto"><table class="data-table">';
-    html += '<thead><tr><th class="min-w-[150px]">Сотрудник</th>';
-    html += '<th>Дни</th>';
+    html += '<thead><tr><th class="min-w-[120px]">Специалист</th><th>Дни</th>';
     
-    monthNames.forEach((m, i) => {
-        const daysInMonth = new Date(year, i + 1, 0).getDate();
-        html += `<th colspan="${daysInMonth}">${m}</th>`;
+    monthShort.forEach((m, i) => {
+        const days = new Date(year, i + 1, 0).getDate();
+        html += `<th colspan="${days}">${m}</th>`;
     });
     html += '</tr></thead><tbody>';
     
     data.forEach(emp => {
-        html += `<tr><td class="font-bold">${escapeHtml(emp.name)}</td>`;
-        html += `<td class="text-center">${emp.totalDays}</td>`;
-        
+        html += `<tr><td class="font-bold">${escapeHtml(emp.name)}</td><td class="text-center">${emp.totalDays}</td>`;
         emp.months.forEach(month => {
             month.days.forEach(day => {
-                const className = day ? `absence-${day.code}` : '';
-                const overlapClass = day?.hasOverlap ? ' overlap' : '';
-                const content = day ? day.code : '';
-                html += `<td class="calendar-cell ${className}${overlapClass}">${content}</td>`;
+                const cls = day ? `absence-${day.code}` : '';
+                const overlap = day?.hasOverlap ? ' overlap' : '';
+                html += `<td class="calendar-cell ${cls}${overlap}">${day ? day.code : ''}</td>`;
             });
         });
-        
         html += '</tr>';
     });
     
@@ -569,88 +742,79 @@ function showVisualPreview(data, year) {
     preview.innerHTML = html;
 }
 
-// ==================== ЭКСПОРТ ====================
-function downloadAllResults() {
-    const wb = XLSX.utils.book_new();
+function downloadVisualCalendar() {
+    if (visualCalendarData.length === 0) {
+        alert('⚠️ Сначала создайте визуальный календарь');
+        return;
+    }
+    
     const year = document.getElementById('calYear')?.value || new Date().getFullYear();
+    const data = visualCalendarData.map(v => ({
+        'Таб.№': v.empId,
+        'Специалист': v.name,
+        'Всего дней отпуска': v.totalDays
+    }));
     
-    if (remoteSchedule.length > 0) {
-        const remoteData = remoteSchedule.map(r => ({
-            'ID': r.empId,
-            'Сотрудник': r.empName,
-            'Начало': formatDate(r.start),
-            'Конец': formatDate(r.end)
-        }));
-        const wsRemote = XLSX.utils.json_to_sheet(remoteData);
-        XLSX.utils.book_append_sheet(wb, wsRemote, 'График удалёнки');
-    }
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Сводка');
     
-    if (visualCalendarData.length > 0) {
-        const visualData = visualCalendarData.map(v => ({
-            'ID': v.empId,
-            'Сотрудник': v.name,
-            'Всего дней отпуска': v.totalDays
-        }));
-        const wsVisual = XLSX.utils.json_to_sheet(visualData);
-        XLSX.utils.book_append_sheet(wb, wsVisual, 'Сводка');
-    }
-    
-    XLSX.writeFile(wb, `Результаты_${year}.xlsx`);
+    XLSX.writeFile(wb, `Визуальный_календарь_${year}_сводка.xlsx`);
 }
 
 // ==================== УТИЛИТЫ ====================
-function showStatus(element, type, message) {
-    if (!element) return;
-    
-    element.classList.remove('hidden', 'visible', 'status-loading', 'status-success', 'status-error');
-    element.classList.add('visible');
-    
-    if (type === 'loading') element.classList.add('status-loading');
-    else if (type === 'success') element.classList.add('status-success');
-    else if (type === 'error') element.classList.add('status-error');
-    
-    element.innerHTML = message;
+function showStatus(el, type, msg) {
+    if (!el) return;
+    el.className = `status-box visible status-${type}`;
+    el.innerHTML = msg;
 }
 
-function activateStep(stepNumber) {
-    // Обновляем индикаторы
+function activateStep(n) {
     for (let i = 1; i <= 3; i++) {
-        const indicator = document.getElementById(`step${i}-indicator`);
-        const section = document.getElementById(`step${i}`);
+        const ind = document.getElementById(`step${i}-indicator`);
+        const sec = document.getElementById(`step${i}`);
+        if (!ind || !sec) continue;
         
-        if (!indicator || !section) continue;
-        
-        if (i < stepNumber) {
-            indicator.className = 'step-indicator step-completed';
-            section.classList.remove('disabled');
-        } else if (i === stepNumber) {
-            indicator.className = 'step-indicator step-active';
-            section.classList.remove('disabled');
+        if (i < n) {
+            ind.className = 'step-indicator step-completed';
+            sec.classList.remove('disabled');
+        } else if (i === n) {
+            ind.className = 'step-indicator step-active';
+            sec.classList.remove('disabled');
         } else {
-            indicator.className = 'step-indicator';
-            section.classList.add('disabled');
+            ind.className = 'step-indicator';
+            sec.classList.add('disabled');
         }
     }
 }
 
-function formatDate(date) {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('ru-RU');
+function formatDate(d) {
+    if (!d) return '';
+    const date = new Date(d);
+    return `${String(date.getDate()).padStart(2,'0')}.${String(date.getMonth()+1).padStart(2,'0')}.${date.getFullYear()}`;
 }
 
-function formatDateKey(date) {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+function formatDateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-function escapeHtml(text) {
+function escapeHtml(t) {
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = t;
     return div.innerHTML;
 }
 
-// ==================== ЭКСПОРТ ФУНКЦИЙ ====================
+// Экспорт функций для window
 window.loadCalendar = loadCalendar;
+window.toggleCalendarPreview = toggleCalendarPreview;
+window.addEmployee = addEmployee;
+window.removeEmployee = removeEmployee;
+window.addAbsence = addAbsence;
+window.removeAbsence = removeAbsence;
 window.generateRemoteSchedule = generateRemoteSchedule;
+window.downloadRemoteSchedule = downloadRemoteSchedule;
 window.generateVisualCalendar = generateVisualCalendar;
-window.downloadAllResults = downloadAllResults;
-window.clearLocalStorage = clearLocalStorage;
+window.downloadVisualCalendar = downloadVisualCalendar;
+window.exportDataJSON = exportDataJSON;
+window.importDataJSON = importDataJSON;
+window.clearAllData = clearAllData;
