@@ -48,7 +48,7 @@ function handleDrop(e) {
     const fileInput = document.getElementById('dataFile');
     if (files.length > 0 && fileInput) {
         fileInput.files = files;
-        loadDataFile(); // Автозагрузка
+        loadDataFile();
     }
 }
 
@@ -118,7 +118,6 @@ async function loadCalendar() {
                 throw new Error('Вставьте полный HTML-код страницы (Ctrl+U → Ctrl+A → Ctrl+C)');
             }
         } else {
-            // Пробуем разные прокси
             const proxyUrls = [
                 `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`,
                 `https://corsproxy.io/?${encodeURIComponent(`https://www.consultant.ru/law/ref/calendar/proizvodstvennye/${year}/`)}`,
@@ -300,7 +299,6 @@ async function loadDataFile() {
         
         renderDataPreview();
         
-        // Показываем секцию графика удалёнки
         document.getElementById('remoteScheduleSection')?.classList.remove('hidden');
         
         showStatus(status, 'success', `✅ Загружено: ${employees.length} сотрудников, ${absences.length} записей`);
@@ -335,19 +333,17 @@ function renderDataPreview() {
     document.getElementById('absCount').textContent = absences.length;
     
     const empTbody = document.getElementById('previewEmployees');
-    // ✅ ИСПРАВЛЕНО: убрано ограничение .slice(0, 10)
     empTbody.innerHTML = employees.map(e => 
         `<tr><td>${escapeHtml(e.id)}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.remoteDays.join(', '))}</td></tr>`
     ).join('') || '<tr><td colspan="3" class="text-center">—</td></tr>';
     
     const absTbody = document.getElementById('previewAbsences');
-    // ✅ ИСПРАВЛЕНО: убрано ограничение .slice(0, 10)
     absTbody.innerHTML = absences.map(a => 
         `<tr><td>${escapeHtml(a.empId)}</td><td>${escapeHtml(a.name)}</td><td>${formatDate(a.start)} – ${formatDate(a.end)}</td></tr>`
     ).join('') || '<tr><td colspan="3" class="text-center">—</td></tr>';
 }
 
-// ==================== ГРАФИК УДАЛЁНКИ (как в макросе VBA) ====================
+// ==================== ГРАФИК УДАЛЁНКИ ====================
 function generateRemoteSchedule() {
     const month = parseInt(document.getElementById('remoteMonth')?.value || 1);
     const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
@@ -498,7 +494,7 @@ function downloadRemoteSchedule() {
     showToast('💾 Файл скачан');
 }
 
-// ==================== ШАГ 3: ГРАФИК ОТПУСКОВ ====================
+// ==================== ШАГ 3: ГРАФИК ОТПУСКОВ (СЕТКА) ====================
 function generateVacationChart() {
     const status = document.getElementById('chartStatus');
     const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
@@ -528,7 +524,8 @@ function renderVacationChart(year, period) {
     chart.classList.remove('hidden');
     
     let monthsToShow = [];
-    let monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+    let monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    let monthNamesShort = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
     
     switch(period) {
         case 'H1': monthsToShow = [0,1,2,3,4,5]; break;
@@ -552,74 +549,101 @@ function renderVacationChart(year, period) {
         if (!empAbsences[a.empId]) {
             empAbsences[a.empId] = { name: a.name || a.empId, periods: [] };
         }
-        if (!empAbsences[a.empId].periods.find(p => p.start === a.start)) {
+        if (!empAbsences[a.empId].periods.find(p => p.start.getTime() === a.start.getTime())) {
             empAbsences[a.empId].periods.push(a);
         }
     });
     
     const overlaps = findOverlaps(absences, year);
     
-    let html = '<div class="timeline-container">';
+    let html = '<div class="timeline-grid-container">';
     
-    html += '<div class="timeline-header">';
-    html += '<div class="timeline-employee-col">Сотрудник</div>';
-    html += '<div class="timeline-months">';
-    monthsToShow.forEach(m => {
-        html += `<div class="timeline-month">${monthNames[m]}</div>`;
+    html += '<div class="timeline-grid-header">';
+    html += '<div class="timeline-employee-col-header">Сотрудник</div>';
+    html += '<div class="timeline-dates-header">';
+    
+    monthsToShow.forEach(monthIdx => {
+        const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+        html += `<div class="timeline-month-group">`;
+        html += `<div class="timeline-month-name">${monthNamesShort[monthIdx]}</div>`;
+        html += `<div class="timeline-days">`;
+        for (let d = 1; d <= daysInMonth; d++) {
+            const date = new Date(year, monthIdx, d);
+            const dayOfWeek = date.getDay();
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            html += `<div class="timeline-day${isWeekend ? ' weekend' : ''}">${d}</div>`;
+        }
+        html += `</div></div>`;
     });
+    
     html += '</div></div>';
+    
+    html += '<div class="timeline-grid-body">';
     
     Object.keys(empAbsences).forEach(empId => {
         const emp = empAbsences[empId];
         if (emp.periods.length === 0) return;
         
-        html += '<div class="timeline-row">';
-        html += `<div class="timeline-employee">${escapeHtml(emp.name)}</div>`;
-        html += '<div class="timeline-bars">';
+        html += '<div class="timeline-grid-row">';
+        html += `<div class="timeline-employee-name">${escapeHtml(emp.name)}</div>`;
+        html += '<div class="timeline-employee-cells">';
         
-        emp.periods.forEach((period) => {
-            const startMonth = period.start.getMonth();
-            const endMonth = period.end.getMonth();
+        monthsToShow.forEach(monthIdx => {
+            const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
             
-            for (let m = startMonth; m <= endMonth; m++) {
-                if (!monthsToShow.includes(m)) continue;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const currentDate = new Date(year, monthIdx, d);
+                let cellClass = 'timeline-cell';
+                let cellTitle = '';
                 
-                const isOverlap = overlaps.some(o => 
-                    o.empId === empId && 
-                    new Date(year, m, 1) >= o.start && 
-                    new Date(year, m, 1) <= o.end
+                const vacationPeriod = emp.periods.find(p => 
+                    currentDate >= p.start && currentDate <= p.end
                 );
                 
-                let className = 'vacation-bar';
-                if (isOverlap) className += ' overlap';
-                else if (period.type && period.type.includes('Больничный')) className += ' sick';
-                else if (period.type && !period.type.includes('Ежегодный')) className += ' other';
-                
-                const monthIndex = monthsToShow.indexOf(m);
-                const daysInMonth = new Date(year, m + 1, 0).getDate();
-                const startOffset = m === startMonth ? (period.start.getDate() - 1) / daysInMonth : 0;
-                const endOffset = m === endMonth ? (daysInMonth - period.end.getDate()) / daysInMonth : 0;
-                
-                const left = monthIndex * (100 / monthsToShow.length) + (startOffset * (100 / monthsToShow.length));
-                const width = ((100 / monthsToShow.length) * (1 - startOffset - endOffset));
-                
-                if (width > 2) {
-                    html += `<div class="${className}" style="left: ${left}%; width: ${width}%; position: absolute;">
-                        <div class="bar-tooltip">
-                            <strong>${escapeHtml(emp.name)}</strong><br>
-                            ${period.type || 'Отпуск'}<br>
-                            ${formatDate(period.start)} – ${formatDate(period.end)}<br>
-                            ${period.days || Math.ceil((period.end-period.start)/86400000)+1} дн.
-                        </div>
-                    </div>`;
+                if (vacationPeriod) {
+                    const hasOverlap = overlaps.some(o => 
+                        o.empId === empId && 
+                        currentDate >= o.start && 
+                        currentDate <= o.end
+                    );
+                    
+                    if (hasOverlap) {
+                        cellClass += ' overlap';
+                        cellTitle = 'Пересечение отпусков';
+                    } else if (vacationPeriod.type && vacationPeriod.type.includes('Больничный')) {
+                        cellClass += ' sick';
+                        cellTitle = 'Больничный';
+                    } else if (vacationPeriod.type && !vacationPeriod.type.includes('Ежегодный')) {
+                        cellClass += ' other-vacation';
+                        cellTitle = vacationPeriod.type;
+                    } else {
+                        cellClass += ' vacation';
+                        cellTitle = 'Ежегодный отпуск';
+                    }
                 }
+                
+                const dayOfWeek = currentDate.getDay();
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                    cellClass += ' weekend';
+                }
+                
+                html += `<div class="${cellClass}" title="${cellTitle}">${vacationPeriod ? '●' : ''}</div>`;
             }
         });
         
         html += '</div></div>';
     });
     
+    html += '</div></div>';
+    
+    html += '<div class="grid-legend">';
+    html += '<div class="legend-item"><span class="legend-box vacation"></span>Отпуск</div>';
+    html += '<div class="legend-item"><span class="legend-box overlap"></span>Пересечение</div>';
+    html += '<div class="legend-item"><span class="legend-box sick"></span>Больничный</div>';
+    html += '<div class="legend-item"><span class="legend-box other-vacation"></span>Другой отпуск</div>';
+    html += '<div class="legend-item"><span class="legend-box weekend"></span>Выходной</div>';
     html += '</div>';
+    
     content.innerHTML = html;
 }
 
