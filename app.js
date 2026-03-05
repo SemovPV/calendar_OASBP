@@ -2,7 +2,6 @@
 
 /**
  * 📅 График удалённой работы — Финальная версия
- * Все исправления: автозагрузка календаря, автозагрузка файла, график удалёнки
  */
 
 let productionCalendar = {};
@@ -15,11 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDataFromStorage();
     updateProgress(1);
     
-    // ✅ АВТОЗАГРУЗКА КАЛЕНДАРЯ при загрузке страницы
+    // Автозагрузка календаря
     setTimeout(() => {
         const year = document.getElementById('calYear')?.value || new Date().getFullYear();
         if (Object.keys(productionCalendar).length === 0) {
-            loadCalendar(); // Автозагрузка календаря
+            loadCalendar();
         }
     }, 500);
 });
@@ -265,7 +264,7 @@ function renderCalendarPreview(calendar, year) {
     }
 }
 
-// ==================== ШАГ 2: ДАННЫЕ (АВТОЗАГРУЗКА) ====================
+// ==================== ШАГ 2: ДАННЫЕ ====================
 async function loadDataFile() {
     const file = document.getElementById('dataFile')?.files[0];
     const status = document.getElementById('dataStatus');
@@ -289,7 +288,7 @@ async function loadDataFile() {
         
         employees = XLSX.utils.sheet_to_json(empSheet).map(row => ({
             id: String(row['Табельный номер'] || row['ID'] || row['Таб.№'] || row['Табельный'] || ''),
-            name: String(row['Специалист'] || row['ФИО'] || row['name'] || row['Сотрудник'] || ''),
+            name: String(row['ФИО'] || row['Специалист'] || row['name'] || row['Сотрудник'] || ''),
             remoteDays: String(row['Дни удаленки'] || row['Дни'] || row['remoteDays'] || '')
                 .toLowerCase().split(',').map(d => d.trim()).filter(d => d)
         })).filter(e => e.id && e.name);
@@ -304,6 +303,11 @@ async function loadDataFile() {
         })).filter(a => a.empId && a.start && a.end);
         
         if (employees.length === 0) throw new Error('Не найдено сотрудников в файле');
+        
+        console.log('✅ Загружено сотрудников:', employees.length);
+        console.log('✅ Загружено отпусков:', absences.length);
+        console.log('Сотрудники:', employees);
+        console.log('Отпуска:', absences);
         
         renderDataPreview();
         
@@ -532,7 +536,6 @@ function renderVacationChart(year, period) {
     chart.classList.remove('hidden');
     
     let monthsToShow = [];
-    let monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
     let monthNamesShort = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
     
     switch(period) {
@@ -545,32 +548,51 @@ function renderVacationChart(year, period) {
         default: monthsToShow = [0,1,2,3,4,5,6,7,8,9,10,11];
     }
     
-    // Собираем отпуска
+    // Создаем маппинг сотрудников по ID для быстрого поиска
+    const employeeMap = {};
+    employees.forEach(emp => {
+        employeeMap[emp.id] = emp.name;
+    });
+    
+    // Собираем все отпуска сгруппированные по сотрудникам
     const empAbsences = {};
+    
+    // Сначала добавляем всех сотрудников из списка
     employees.forEach(emp => {
         empAbsences[emp.id] = {
-            name: emp.name,
-            periods: absences.filter(a => a.empId === emp.id && a.start.getFullYear() === year)
+            name: emp.name, // ✅ Используем полное ФИО из списка сотрудников
+            periods: []
         };
     });
     
-    // Добавляем сотрудников из отпусков
+    // Затем добавляем отпуска
     absences.filter(a => a.start.getFullYear() === year).forEach(a => {
         if (!empAbsences[a.empId]) {
-            empAbsences[a.empId] = { name: a.name || a.empId, periods: [] };
+            // Если сотрудника нет в списке, используем имя из отпуска
+            empAbsences[a.empId] = {
+                name: a.name || a.empId,
+                periods: []
+            };
         }
-        if (!empAbsences[a.empId].periods.find(p => p.start.getTime() === a.start.getTime())) {
+        // Добавляем отпуск если его еще нет
+        const exists = empAbsences[a.empId].periods.some(p => 
+            p.start.getTime() === a.start.getTime() && 
+            p.end.getTime() === a.end.getTime()
+        );
+        if (!exists) {
             empAbsences[a.empId].periods.push(a);
         }
     });
     
-    console.log('📊 Отпуска для графика:', empAbsences);
+    console.log('📊 График отпусков за', year, 'год:');
+    console.log('Всего сотрудников:', Object.keys(empAbsences).length);
+    console.log('empAbsences:', empAbsences);
     
     const overlaps = findOverlaps(absences, year);
     
     let html = '<div class="timeline-grid-container">';
     
-    // ЗАГОЛОВОК с месяцами и днями
+    // ЗАГОЛОВОК
     html += '<div class="timeline-grid-header">';
     html += '<div class="timeline-employee-col-header">Сотрудник</div>';
     html += '<div class="timeline-dates-header">';
@@ -591,20 +613,24 @@ function renderVacationChart(year, period) {
     
     html += '</div></div>';
     
-    // ТЕЛО таблицы - сотрудники
+    // ТЕЛО таблицы
     html += '<div class="timeline-grid-body">';
     
-    Object.keys(empAbsences).forEach(empId => {
+    const empIds = Object.keys(empAbsences);
+    console.log('Сотрудники для отображения:', empIds.length, empIds);
+    
+    empIds.forEach(empId => {
         const emp = empAbsences[empId];
+        
         if (emp.periods.length === 0) {
-            console.log(`⚠️ Сотрудник ${emp.name} не имеет отпусков в ${year} году`);
+            console.log(`⚠️ ${emp.name} (${empId}) - нет отпусков`);
             return;
         }
         
-        console.log(`✅ Сотрудник ${emp.name} имеет ${emp.periods.length} отпуск(а)`, emp.periods);
+        console.log(`✅ ${emp.name} (${empId}) - ${emp.periods.length} отпуск(а):`, emp.periods);
         
         html += '<div class="timeline-grid-row">';
-        html += `<div class="timeline-employee-name">${escapeHtml(emp.name)}</div>`;
+        html += `<div class="timeline-employee-name">${escapeHtml(emp.name)}</div>`; // ✅ Полное ФИО
         html += '<div class="timeline-employee-cells">';
         
         monthsToShow.forEach(monthIdx => {
@@ -614,13 +640,12 @@ function renderVacationChart(year, period) {
                 const currentDate = new Date(year, monthIdx, d);
                 let cellClass = 'timeline-cell';
                 let cellTitle = '';
-                let cellContent = ''; // ПУСТО по умолчанию!
+                let cellContent = '';
                 
-                // Проверяем, попадает ли день в отпуск
-                const vacationPeriod = emp.periods.find(p => {
-                    const inRange = currentDate >= p.start && currentDate <= p.end;
-                    return inRange;
-                });
+                // Проверяем отпуск
+                const vacationPeriod = emp.periods.find(p => 
+                    currentDate >= p.start && currentDate <= p.end
+                );
                 
                 if (vacationPeriod) {
                     const hasOverlap = overlaps.some(o => 
@@ -643,7 +668,7 @@ function renderVacationChart(year, period) {
                         cellTitle = 'Ежегодный отпуск';
                     }
                     
-                    cellContent = '●'; // ТОЛЬКО в дни отпуска!
+                    cellContent = '●';
                 }
                 
                 // Выходные
