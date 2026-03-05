@@ -1,3 +1,5 @@
+/*app.js*/
+
 /**
  * 📅 График удалённой работы — Финальная версия
  * Все исправления: автозагрузка календаря, автозагрузка файла, график удалёнки
@@ -333,12 +335,14 @@ function renderDataPreview() {
     document.getElementById('absCount').textContent = absences.length;
     
     const empTbody = document.getElementById('previewEmployees');
-    empTbody.innerHTML = employees.slice(0, 10).map(e => 
+    // ✅ ИСПРАВЛЕНО: убрано ограничение .slice(0, 10)
+    empTbody.innerHTML = employees.map(e => 
         `<tr><td>${escapeHtml(e.id)}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.remoteDays.join(', '))}</td></tr>`
     ).join('') || '<tr><td colspan="3" class="text-center">—</td></tr>';
     
     const absTbody = document.getElementById('previewAbsences');
-    absTbody.innerHTML = absences.slice(0, 10).map(a => 
+    // ✅ ИСПРАВЛЕНО: убрано ограничение .slice(0, 10)
+    absTbody.innerHTML = absences.map(a => 
         `<tr><td>${escapeHtml(a.empId)}</td><td>${escapeHtml(a.name)}</td><td>${formatDate(a.start)} – ${formatDate(a.end)}</td></tr>`
     ).join('') || '<tr><td colspan="3" class="text-center">—</td></tr>';
 }
@@ -371,13 +375,11 @@ function generateRemoteSchedule() {
 }
 
 function generateRemoteLogic(year, month) {
-    // Логика из VBA макроса "Заполнить_График_Удалёнки()"
     const schedule = [];
     const firstDay = new Date(year, month-1, 1);
     const lastDay = new Date(year, month, 0);
     const dayNames = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
     
-    // Словари отсутствий
     const regularAbs = {};
     const remoteSick = {};
     
@@ -397,27 +399,21 @@ function generateRemoteLogic(year, month) {
         for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate()+1)) {
             const key = formatDateKey(d);
             
-            // Проверка: рабочий день по производственному календарю
             if (!productionCalendar[key]?.isWorking) continue;
             
-            // Проверка: сотрудник в отпуске/на обычном больничном (исключаем)
             const isRegularAbsent = regularAbs[emp.id]?.some(p => d >= p.start && d <= p.end);
             if (isRegularAbsent) continue;
             
-            // Проверка: больничный удаленно (добавляем даже если не день по графику)
             const isRemoteSick = remoteSick[emp.id]?.some(p => d >= p.start && d <= p.end);
             
-            // Проверка: день по графику удалёнки
             const wd = dayNames[d.getDay()];
             const isPreferredDay = emp.remoteDays.some(pref => wd.includes(pref));
             
-            // Добавляем если: день по графику ИЛИ больничный удаленно
             if ((isPreferredDay && !isRemoteSick) || isRemoteSick) {
                 dates.push(new Date(d));
             }
         }
         
-        // Группировка последовательных дат (как в VBA)
         if (dates.length > 0) {
             const groups = groupDates(dates);
             groups.forEach(g => {
@@ -552,7 +548,6 @@ function renderVacationChart(year, period) {
         };
     });
     
-    // Добавляем сотрудников из отпусков
     absences.filter(a => a.start.getFullYear() === year).forEach(a => {
         if (!empAbsences[a.empId]) {
             empAbsences[a.empId] = { name: a.name || a.empId, periods: [] };
