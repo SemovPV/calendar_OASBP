@@ -198,15 +198,17 @@ function parseCalendarFromHTML(html, year) {
                 currentMonth = monthNames.findIndex(m => txt.includes(m)) + 1;
             }
             row.querySelectorAll('td').forEach(cell => {
-                let dayText = cell.innerText.trim().replace('*', '');
+                let dayText = cell.innerText.trim().replace('*', ''); // ✅ Удаляем * для проверки
                 if (dayText && !isNaN(dayText) && currentMonth) {
                     const day = parseInt(dayText);
                     const key = `${year}-${String(currentMonth).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
                     const cls = cell.className || '';
+                    
+                    // ✅ ИСПРАВЛЕНО: Предпраздничные дни НЕ являются праздниками
                     calendar[key] = {
-                        isWorking: !cls.includes('weekend') && !cls.includes('holiday'),
-                        isHoliday: cls.includes('weekend') || cls.includes('holiday'),
-                        isPreHoliday: cls.includes('preholiday'),
+                        isWorking: !cls.includes('weekend') && !cls.includes('holiday'), // ✅ Рабочий если не выходной и не праздник
+                        isHoliday: cls.includes('weekend') || cls.includes('holiday'), // ✅ Праздник только если выходной или праздник
+                        isPreHoliday: cls.includes('preholiday'), // ✅ Предпраздничный - отдельный флаг
                         day, month: currentMonth
                     };
                 }
@@ -839,3 +841,4 @@ window.generateVacationChart = generateVacationChart;
 window.downloadResults = downloadResults;
 window.exportDataJSON = exportDataJSON;
 window.clearAllData = clearAllData;
+
