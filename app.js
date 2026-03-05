@@ -14,6 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
     loadDataFromStorage();
     updateProgress(1);
+    
+    // ✅ АВТОЗАГРУЗКА КАЛЕНДАРЯ при загрузке страницы
+    setTimeout(() => {
+        const year = document.getElementById('calYear')?.value || new Date().getFullYear();
+        if (Object.keys(productionCalendar).length === 0) {
+            loadCalendar(); // Автозагрузка календаря
+        }
+    }, 500);
 });
 
 function initEventListeners() {
