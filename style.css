@@ -569,7 +569,10 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 }
 
 .timeline-day.preholiday {
-    border: 2px solid #ff9800;
+    background: #fff3e0;  /* ✅ Светло-оранжевый (рабочий день) */
+    color: #e65100;
+    font-weight: 700;
+    border: 1px solid #ff9800;
 }
 
 .timeline-grid-body {
@@ -682,7 +685,9 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 }
 
 .timeline-cell.preholiday {
-    border: 2px solid #ff9800;
+    background: #fff3e0;  /* ✅ Светло-оранжевый (рабочий день) */
+    color: #e65100;
+    border: 1px solid #ff9800;
 }
 
 @keyframes pulse-cell {
@@ -817,3 +822,4 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 ::-webkit-scrollbar-track { background: var(--gray-100); border-radius: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-500); }
+
