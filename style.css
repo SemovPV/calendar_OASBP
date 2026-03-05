@@ -532,30 +532,44 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-200);
 }
 
 .timeline-days {
-    display: grid;
-    grid-template-columns: repeat(31, 1fr);
+    display: flex;
     gap: 1px;
     padding: 6px;
     background: var(--gray-50);
 }
 
 .timeline-day {
-    text-align: center;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 10px;
     font-weight: 600;
-    padding: 4px 2px;
     background: white;
     border-radius: 3px;
     color: var(--gray-700);
+    flex-shrink: 0;
 }
 
 .timeline-day.weekend {
     background: #ffebee;
     color: #c62828;
     font-weight: 700;
+}
+
+.timeline-day.holiday {
+    background: #ffcdd2;
+    color: #b71c1c;
+    font-weight: 700;
+}
+
+.timeline-day.preholiday {
+    border: 2px solid #ff9800;
 }
 
 .timeline-grid-body {
@@ -598,8 +612,7 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 }
 
 .timeline-employee-cells {
-    display: grid;
-    grid-template-columns: repeat(365, 30px);
+    display: flex;
     gap: 1px;
     padding: 8px;
     background: var(--gray-50);
@@ -618,6 +631,7 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     transition: all 0.2s;
     position: relative;
     border: 1px solid transparent;
+    flex-shrink: 0;
 }
 
 .timeline-cell:hover {
@@ -657,8 +671,18 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 }
 
 .timeline-cell.weekend {
-    background: #f5f5f5;
-    color: #bbb;
+    background: #ffebee;
+    color: #ef9a9a;
+}
+
+.timeline-cell.holiday {
+    background: #ffcdd2;
+    color: #e57373;
+    font-weight: 600;
+}
+
+.timeline-cell.preholiday {
+    border: 2px solid #ff9800;
 }
 
 @keyframes pulse-cell {
@@ -711,8 +735,12 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     border-color: #FFD966;
 }
 .legend-box.weekend { 
-    background: #f5f5f5;
-    border-color: #ddd;
+    background: #ffebee;
+    border-color: #ef9a9a;
+}
+.legend-box.holiday { 
+    background: #ffcdd2;
+    border-color: #e57373;
 }
 
 /* Footer */
@@ -759,20 +787,17 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
     .calendar-grid { grid-template-columns: repeat(2, 1fr); }
     .preview-grid { grid-template-columns: 1fr; }
     
-    .timeline-cell {
+    .timeline-cell,
+    .timeline-day {
         width: 26px;
         height: 26px;
-        font-size: 12px;
+        font-size: 9px;
     }
     .timeline-employee-name,
     .timeline-employee-col-header {
         min-width: 200px;
         font-size: 12px;
         padding: 10px 12px;
-    }
-    .timeline-day {
-        font-size: 9px;
-        padding: 3px 1px;
     }
     .timeline-month-name {
         font-size: 11px;
@@ -786,12 +811,10 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
         width: 24px;
         height: 24px;
     }
-    .timeline-employee-cells {
-        grid-template-columns: repeat(365, 26px);
-    }
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--gray-100); border-radius: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-500); }
+
