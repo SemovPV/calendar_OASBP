@@ -354,7 +354,17 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 }
 .calendar-day.empty { background: #fafafa; }
 .calendar-day.holiday { background: #FFC7CE; color: #9C0006; font-weight: 600; }
-.calendar-day.preholiday::after { content: "*"; font-size: 8px; margin-left: 2px; color: var(--danger); }
+.calendar-day.preholiday {
+    background: #fff3e0;
+    color: #e65100;
+    font-weight: 600;
+}
+.calendar-day.preholiday::after { 
+    content: "*"; 
+    font-size: 8px; 
+    margin-left: 2px; 
+    color: #e65100; 
+}
 
 /* Превью данных */
 .data-preview { margin-top: 24px; }
@@ -569,7 +579,7 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 }
 
 .timeline-day.preholiday {
-    background: #fff3e0;  /* ✅ Светло-оранжевый (рабочий день) */
+    background: #fff3e0;
     color: #e65100;
     font-weight: 700;
     border: 1px solid #ff9800;
@@ -685,7 +695,7 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 }
 
 .timeline-cell.preholiday {
-    background: #fff3e0;  /* ✅ Светло-оранжевый (рабочий день) */
+    background: #fff3e0;
     color: #e65100;
     border: 1px solid #ff9800;
 }
@@ -746,6 +756,10 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 .legend-box.holiday { 
     background: #ffcdd2;
     border-color: #e57373;
+}
+.legend-box.preholiday { 
+    background: #fff3e0;
+    border-color: #ff9800;
 }
 
 /* Footer */
@@ -822,4 +836,3 @@ textarea { padding: 14px; font-family: monospace; font-size: 13px; resize: verti
 ::-webkit-scrollbar-track { background: var(--gray-100); border-radius: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-500); }
-
