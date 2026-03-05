@@ -14,11 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDataFromStorage();
     updateProgress(1);
     
-    // Автозагрузка календаря
+    // Автозагрузка календаря если нет в кэше
     setTimeout(() => {
         const year = document.getElementById('calYear')?.value || new Date().getFullYear();
         if (Object.keys(productionCalendar).length === 0) {
+            console.log('📅 Автозагрузка календаря за', year, 'год');
             loadCalendar();
+        } else {
+            console.log('✅ Календарь загружен из кэша:', Object.keys(productionCalendar).length, 'дней');
         }
     }, 500);
 });
@@ -65,6 +68,7 @@ function saveDataToStorage() {
             productionCalendar, employees, absences,
             calYear: document.getElementById('calYear')?.value
         }));
+        console.log('💾 Данные сохранены в localStorage');
     } catch (e) { console.warn('Save error:', e); }
 }
 
@@ -79,6 +83,11 @@ function loadDataFromStorage() {
             if (data.calYear && document.getElementById('calYear')) {
                 document.getElementById('calYear').value = data.calYear;
             }
+            console.log('📥 Загружено из кэша:');
+            console.log('  - Календарь:', Object.keys(productionCalendar).length, 'дней');
+            console.log('  - Сотрудников:', employees.length);
+            console.log('  - Отпусков:', absences.length);
+            
             if (Object.keys(productionCalendar).length > 0) {
                 const year = document.getElementById('calYear')?.value || new Date().getFullYear();
                 renderCalendarPreview(productionCalendar, year);
@@ -306,8 +315,6 @@ async function loadDataFile() {
         
         console.log('✅ Загружено сотрудников:', employees.length);
         console.log('✅ Загружено отпусков:', absences.length);
-        console.log('Сотрудники:', employees);
-        console.log('Отпуска:', absences);
         
         renderDataPreview();
         
@@ -507,6 +514,27 @@ function downloadRemoteSchedule() {
 }
 
 // ==================== ШАГ 3: ГРАФИК ОТПУСКОВ (СЕТКА) ====================
+function generateVacationChart() {
+    const status = document.getElementById('chartStatus');
+    const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
+    const period = document.getElementById('viewPeriod')?.value || 'year';
+    
+    if (absences.length === 0) {
+        showStatus(status, 'error', '⚠️ Загрузите данные на шаге 2');
+        return;
+    }
+    
+    showStatus(status, 'loading', '⏳ Построение графика...');
+    
+    try {
+        renderVacationChart(year, period);
+        showStatus(status, 'success', `✅ График построен: ${employees.length} сотрудников`);
+        showToast('📊 График готов');
+    } catch (e) {
+        showStatus(status, 'error', `❌ ${e.message}`);
+    }
+}
+
 function renderVacationChart(year, period) {
     const chart = document.getElementById('vacationChart');
     const content = document.getElementById('chartContent');
@@ -790,4 +818,3 @@ window.generateVacationChart = generateVacationChart;
 window.downloadResults = downloadResults;
 window.exportDataJSON = exportDataJSON;
 window.clearAllData = clearAllData;
-
