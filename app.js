@@ -198,7 +198,7 @@ function parseCalendarFromHTML(html, year) {
                 currentMonth = monthNames.findIndex(m => txt.includes(m)) + 1;
             }
             row.querySelectorAll('td').forEach(cell => {
-                let dayText = cell.innerText.trim().replace('*', ''); // ✅ Удаляем * для проверки
+                let dayText = cell.innerText.trim().replace('*', '');
                 if (dayText && !isNaN(dayText) && currentMonth) {
                     const day = parseInt(dayText);
                     const key = `${year}-${String(currentMonth).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -206,9 +206,9 @@ function parseCalendarFromHTML(html, year) {
                     
                     // ✅ ИСПРАВЛЕНО: Предпраздничные дни НЕ являются праздниками
                     calendar[key] = {
-                        isWorking: !cls.includes('weekend') && !cls.includes('holiday'), // ✅ Рабочий если не выходной и не праздник
-                        isHoliday: cls.includes('weekend') || cls.includes('holiday'), // ✅ Праздник только если выходной или праздник
-                        isPreHoliday: cls.includes('preholiday'), // ✅ Предпраздничный - отдельный флаг
+                        isWorking: !cls.includes('weekend') && !cls.includes('holiday'),
+                        isHoliday: cls.includes('weekend') || cls.includes('holiday'),
+                        isPreHoliday: cls.includes('preholiday'),
                         day, month: currentMonth
                     };
                 }
@@ -300,7 +300,6 @@ async function loadDataFile() {
         // ✅ ИСПРАВЛЕНО: Чистка ФИО от переносов строк и пробелов
         employees = XLSX.utils.sheet_to_json(empSheet).map(row => {
             let name = String(row['ФИО'] || row['Специалист'] || row['name'] || row['Сотрудник'] || '');
-            // Удаляем переносы строк и лишние пробелы
             name = name.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
             
             return {
@@ -330,7 +329,6 @@ async function loadDataFile() {
         
         console.log('✅ Загружено сотрудников:', employees.length);
         console.log('✅ Загружено отпусков:', absences.length);
-        console.log('Сотрудники:', employees);
         
         renderDataPreview();
         
@@ -571,7 +569,7 @@ function renderVacationChart(year, period) {
         default: monthsToShow = [0,1,2,3,4,5,6,7,8,9,10,11];
     }
     
-    // ✅ ВАЖНО: Считаем общее количество дней для единой сетки
+    // Считаем общее количество дней для единой сетки
     let totalDays = 0;
     const monthDays = [];
     monthsToShow.forEach(monthIdx => {
@@ -676,7 +674,7 @@ function renderVacationChart(year, period) {
         html += `<div class="timeline-employee-name">${escapeHtml(emp.name)}</div>`;
         html += '<div class="timeline-employee-cells">';
         
-        // ✅ ВАЖНО: Используем ТОТ ЖЕ массив allDates для тела
+        // Используем ТОТ ЖЕ массив allDates для тела
         allDates.forEach((currentDate, idx) => {
             const dateKey = formatDateKey(currentDate);
             let cellClass = 'timeline-cell';
@@ -727,7 +725,7 @@ function renderVacationChart(year, period) {
             }
             if (isPreHoliday) {
                 cellClass += ' preholiday';
-                if (!cellTitle) cellTitle = 'Предпраздничный день';
+                if (!cellTitle) cellTitle = 'Предпраздничный день (сокращенный)';
             }
             
             html += `<div class="${cellClass}" title="${cellTitle}">${cellContent}</div>`;
@@ -746,6 +744,7 @@ function renderVacationChart(year, period) {
     html += '<div class="legend-item"><span class="legend-box other-vacation"></span>Другой отпуск</div>';
     html += '<div class="legend-item"><span class="legend-box weekend"></span>Выходной</div>';
     html += '<div class="legend-item"><span class="legend-box holiday"></span>Праздник</div>';
+    html += '<div class="legend-item"><span class="legend-box preholiday"></span>Предпраздничный</div>';
     html += '</div>';
     
     content.innerHTML = html;
@@ -841,4 +840,3 @@ window.generateVacationChart = generateVacationChart;
 window.downloadResults = downloadResults;
 window.exportDataJSON = exportDataJSON;
 window.clearAllData = clearAllData;
-
