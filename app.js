@@ -507,27 +507,6 @@ function downloadRemoteSchedule() {
 }
 
 // ==================== ШАГ 3: ГРАФИК ОТПУСКОВ (СЕТКА) ====================
-function generateVacationChart() {
-    const status = document.getElementById('chartStatus');
-    const year = parseInt(document.getElementById('calYear')?.value || new Date().getFullYear());
-    const period = document.getElementById('viewPeriod')?.value || 'year';
-    
-    if (absences.length === 0) {
-        showStatus(status, 'error', '⚠️ Загрузите данные на шаге 2');
-        return;
-    }
-    
-    showStatus(status, 'loading', '⏳ Построение графика...');
-    
-    try {
-        renderVacationChart(year, period);
-        showStatus(status, 'success', `✅ График построен: ${employees.length} сотрудников`);
-        showToast('📊 График готов');
-    } catch (e) {
-        showStatus(status, 'error', `❌ ${e.message}`);
-    }
-}
-
 function renderVacationChart(year, period) {
     const chart = document.getElementById('vacationChart');
     const content = document.getElementById('chartContent');
@@ -548,33 +527,37 @@ function renderVacationChart(year, period) {
         default: monthsToShow = [0,1,2,3,4,5,6,7,8,9,10,11];
     }
     
-    // Создаем маппинг сотрудников по ID для быстрого поиска
+    // Подсчитываем общее количество дней в периоде
+    let totalDays = 0;
+    monthsToShow.forEach(monthIdx => {
+        totalDays += new Date(year, monthIdx + 1, 0).getDate();
+    });
+    
+    console.log('📊 Период:', period, 'Месяцев:', monthsToShow.length, 'Дней:', totalDays);
+    
+    // Создаем маппинг сотрудников
     const employeeMap = {};
     employees.forEach(emp => {
         employeeMap[emp.id] = emp.name;
     });
     
-    // Собираем все отпуска сгруппированные по сотрудникам
+    // Собираем отпуска
     const empAbsences = {};
     
-    // Сначала добавляем всех сотрудников из списка
     employees.forEach(emp => {
         empAbsences[emp.id] = {
-            name: emp.name, // ✅ Используем полное ФИО из списка сотрудников
+            name: emp.name,
             periods: []
         };
     });
     
-    // Затем добавляем отпуска
     absences.filter(a => a.start.getFullYear() === year).forEach(a => {
         if (!empAbsences[a.empId]) {
-            // Если сотрудника нет в списке, используем имя из отпуска
             empAbsences[a.empId] = {
                 name: a.name || a.empId,
                 periods: []
             };
         }
-        // Добавляем отпуск если его еще нет
         const exists = empAbsences[a.empId].periods.some(p => 
             p.start.getTime() === a.start.getTime() && 
             p.end.getTime() === a.end.getTime()
@@ -583,10 +566,6 @@ function renderVacationChart(year, period) {
             empAbsences[a.empId].periods.push(a);
         }
     });
-    
-    console.log('📊 График отпусков за', year, 'год:');
-    console.log('Всего сотрудников:', Object.keys(empAbsences).length);
-    console.log('empAbsences:', empAbsences);
     
     const overlaps = findOverlaps(absences, year);
     
@@ -597,6 +576,7 @@ function renderVacationChart(year, period) {
     html += '<div class="timeline-employee-col-header">Сотрудник</div>';
     html += '<div class="timeline-dates-header">';
     
+    let dayCounter = 0;
     monthsToShow.forEach(monthIdx => {
         const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
         html += `<div class="timeline-month-group">`;
@@ -604,9 +584,19 @@ function renderVacationChart(year, period) {
         html += `<div class="timeline-days">`;
         for (let d = 1; d <= daysInMonth; d++) {
             const date = new Date(year, monthIdx, d);
+            const dateKey = formatDateKey(date);
             const dayOfWeek = date.getDay();
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-            html += `<div class="timeline-day${isWeekend ? ' weekend' : ''}">${d}</div>`;
+            const isHoliday = productionCalendar[dateKey]?.isHoliday || false;
+            const isPreHoliday = productionCalendar[dateKey]?.isPreHoliday || false;
+            
+            let dayClass = 'timeline-day';
+            if (isHoliday) dayClass += ' holiday';
+            else if (isWeekend) dayClass += ' weekend';
+            if (isPreHoliday) dayClass += ' preholiday';
+            
+            html += `<div class="${dayClass}" data-day="${dayCounter}">${d}</div>`;
+            dayCounter++;
         }
         html += `</div></div>`;
     });
@@ -617,27 +607,25 @@ function renderVacationChart(year, period) {
     html += '<div class="timeline-grid-body">';
     
     const empIds = Object.keys(empAbsences);
-    console.log('Сотрудники для отображения:', empIds.length, empIds);
     
     empIds.forEach(empId => {
         const emp = empAbsences[empId];
         
         if (emp.periods.length === 0) {
-            console.log(`⚠️ ${emp.name} (${empId}) - нет отпусков`);
             return;
         }
         
-        console.log(`✅ ${emp.name} (${empId}) - ${emp.periods.length} отпуск(а):`, emp.periods);
-        
         html += '<div class="timeline-grid-row">';
-        html += `<div class="timeline-employee-name">${escapeHtml(emp.name)}</div>`; // ✅ Полное ФИО
+        html += `<div class="timeline-employee-name">${escapeHtml(emp.name)}</div>`;
         html += '<div class="timeline-employee-cells">';
         
+        dayCounter = 0;
         monthsToShow.forEach(monthIdx => {
             const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
             
             for (let d = 1; d <= daysInMonth; d++) {
                 const currentDate = new Date(year, monthIdx, d);
+                const dateKey = formatDateKey(currentDate);
                 let cellClass = 'timeline-cell';
                 let cellTitle = '';
                 let cellContent = '';
@@ -671,13 +659,26 @@ function renderVacationChart(year, period) {
                     cellContent = '●';
                 }
                 
-                // Выходные
+                // Выходные и праздники из производственного календаря
                 const dayOfWeek = currentDate.getDay();
-                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const isHoliday = productionCalendar[dateKey]?.isHoliday || false;
+                const isPreHoliday = productionCalendar[dateKey]?.isPreHoliday || false;
+                
+                if (isHoliday) {
+                    cellClass += ' holiday';
+                    if (!cellTitle) cellTitle = 'Праздничный день';
+                } else if (isWeekend) {
                     cellClass += ' weekend';
+                    if (!cellTitle) cellTitle = 'Выходной день';
+                }
+                if (isPreHoliday) {
+                    cellClass += ' preholiday';
+                    if (!cellTitle) cellTitle = 'Предпраздничный день';
                 }
                 
                 html += `<div class="${cellClass}" title="${cellTitle}">${cellContent}</div>`;
+                dayCounter++;
             }
         });
         
@@ -693,6 +694,7 @@ function renderVacationChart(year, period) {
     html += '<div class="legend-item"><span class="legend-box sick"></span>Больничный</div>';
     html += '<div class="legend-item"><span class="legend-box other-vacation"></span>Другой отпуск</div>';
     html += '<div class="legend-item"><span class="legend-box weekend"></span>Выходной</div>';
+    html += '<div class="legend-item"><span class="legend-box holiday"></span>Праздник</div>';
     html += '</div>';
     
     content.innerHTML = html;
@@ -788,3 +790,4 @@ window.generateVacationChart = generateVacationChart;
 window.downloadResults = downloadResults;
 window.exportDataJSON = exportDataJSON;
 window.clearAllData = clearAllData;
+
