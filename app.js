@@ -545,6 +545,7 @@ function renderVacationChart(year, period) {
         default: monthsToShow = [0,1,2,3,4,5,6,7,8,9,10,11];
     }
     
+    // Собираем отпуска
     const empAbsences = {};
     employees.forEach(emp => {
         empAbsences[emp.id] = {
@@ -553,6 +554,7 @@ function renderVacationChart(year, period) {
         };
     });
     
+    // Добавляем сотрудников из отпусков
     absences.filter(a => a.start.getFullYear() === year).forEach(a => {
         if (!empAbsences[a.empId]) {
             empAbsences[a.empId] = { name: a.name || a.empId, periods: [] };
@@ -562,10 +564,13 @@ function renderVacationChart(year, period) {
         }
     });
     
+    console.log('📊 Отпуска для графика:', empAbsences);
+    
     const overlaps = findOverlaps(absences, year);
     
     let html = '<div class="timeline-grid-container">';
     
+    // ЗАГОЛОВОК с месяцами и днями
     html += '<div class="timeline-grid-header">';
     html += '<div class="timeline-employee-col-header">Сотрудник</div>';
     html += '<div class="timeline-dates-header">';
@@ -586,11 +591,17 @@ function renderVacationChart(year, period) {
     
     html += '</div></div>';
     
+    // ТЕЛО таблицы - сотрудники
     html += '<div class="timeline-grid-body">';
     
     Object.keys(empAbsences).forEach(empId => {
         const emp = empAbsences[empId];
-        if (emp.periods.length === 0) return;
+        if (emp.periods.length === 0) {
+            console.log(`⚠️ Сотрудник ${emp.name} не имеет отпусков в ${year} году`);
+            return;
+        }
+        
+        console.log(`✅ Сотрудник ${emp.name} имеет ${emp.periods.length} отпуск(а)`, emp.periods);
         
         html += '<div class="timeline-grid-row">';
         html += `<div class="timeline-employee-name">${escapeHtml(emp.name)}</div>`;
@@ -603,10 +614,13 @@ function renderVacationChart(year, period) {
                 const currentDate = new Date(year, monthIdx, d);
                 let cellClass = 'timeline-cell';
                 let cellTitle = '';
+                let cellContent = ''; // ПУСТО по умолчанию!
                 
-                const vacationPeriod = emp.periods.find(p => 
-                    currentDate >= p.start && currentDate <= p.end
-                );
+                // Проверяем, попадает ли день в отпуск
+                const vacationPeriod = emp.periods.find(p => {
+                    const inRange = currentDate >= p.start && currentDate <= p.end;
+                    return inRange;
+                });
                 
                 if (vacationPeriod) {
                     const hasOverlap = overlaps.some(o => 
@@ -628,14 +642,17 @@ function renderVacationChart(year, period) {
                         cellClass += ' vacation';
                         cellTitle = 'Ежегодный отпуск';
                     }
+                    
+                    cellContent = '●'; // ТОЛЬКО в дни отпуска!
                 }
                 
+                // Выходные
                 const dayOfWeek = currentDate.getDay();
                 if (dayOfWeek === 0 || dayOfWeek === 6) {
                     cellClass += ' weekend';
                 }
                 
-                html += `<div class="${cellClass}" title="${cellTitle}">${vacationPeriod ? '●' : ''}</div>`;
+                html += `<div class="${cellClass}" title="${cellTitle}">${cellContent}</div>`;
             }
         });
         
@@ -644,6 +661,7 @@ function renderVacationChart(year, period) {
     
     html += '</div></div>';
     
+    // Легенда
     html += '<div class="grid-legend">';
     html += '<div class="legend-item"><span class="legend-box vacation"></span>Отпуск</div>';
     html += '<div class="legend-item"><span class="legend-box overlap"></span>Пересечение</div>';
