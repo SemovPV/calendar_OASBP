@@ -295,26 +295,40 @@ async function loadDataFile() {
         const empSheet = workbook.Sheets[empSheetName];
         const absSheet = workbook.Sheets[absSheetName];
         
-        employees = XLSX.utils.sheet_to_json(empSheet).map(row => ({
-            id: String(row['Табельный номер'] || row['ID'] || row['Таб.№'] || row['Табельный'] || ''),
-            name: String(row['ФИО'] || row['Специалист'] || row['name'] || row['Сотрудник'] || ''),
-            remoteDays: String(row['Дни удаленки'] || row['Дни'] || row['remoteDays'] || '')
-                .toLowerCase().split(',').map(d => d.trim()).filter(d => d)
-        })).filter(e => e.id && e.name);
+        // ✅ ИСПРАВЛЕНО: Чистка ФИО от переносов строк и пробелов
+        employees = XLSX.utils.sheet_to_json(empSheet).map(row => {
+            let name = String(row['ФИО'] || row['Специалист'] || row['name'] || row['Сотрудник'] || '');
+            // Удаляем переносы строк и лишние пробелы
+            name = name.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+            
+            return {
+                id: String(row['Табельный номер'] || row['ID'] || row['Таб.№'] || row['Табельный'] || ''),
+                name: name,
+                remoteDays: String(row['Дни удаленки'] || row['Дни'] || row['remoteDays'] || '')
+                    .toLowerCase().split(',').map(d => d.trim()).filter(d => d)
+            };
+        }).filter(e => e.id && e.name);
         
-        absences = XLSX.utils.sheet_to_json(absSheet).map(row => ({
-            empId: String(row['Таб.№'] || row['Табельный номер'] || row['ID'] || row['Таб'] || ''),
-            name: String(row['ФИО'] || row['Специалист'] || row['name'] || ''),
-            type: String(row['Тип отсутствия'] || row['Тип'] || row['type'] || ''),
-            start: parseExcelDate(row['Дата начала'] || row['Начало'] || row['start']),
-            end: parseExcelDate(row['Дата окончания'] || row['Конец'] || row['end']),
-            days: parseInt(row['Кол-во дней'] || row['days'] || 0) || 0
-        })).filter(a => a.empId && a.start && a.end);
+        // ✅ ИСПРАВЛЕНО: Чистка ФИО в отпуска
+        absences = XLSX.utils.sheet_to_json(absSheet).map(row => {
+            let name = String(row['ФИО'] || row['Специалист'] || row['name'] || '');
+            name = name.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+            
+            return {
+                empId: String(row['Таб.№'] || row['Табельный номер'] || row['ID'] || row['Таб'] || ''),
+                name: name,
+                type: String(row['Тип отсутствия'] || row['Тип'] || row['type'] || ''),
+                start: parseExcelDate(row['Дата начала'] || row['Начало'] || row['start']),
+                end: parseExcelDate(row['Дата окончания'] || row['Конец'] || row['end']),
+                days: parseInt(row['Кол-во дней'] || row['days'] || 0) || 0
+            };
+        }).filter(a => a.empId && a.start && a.end);
         
         if (employees.length === 0) throw new Error('Не найдено сотрудников в файле');
         
         console.log('✅ Загружено сотрудников:', employees.length);
         console.log('✅ Загружено отпусков:', absences.length);
+        console.log('Сотрудники:', employees);
         
         renderDataPreview();
         
@@ -555,13 +569,25 @@ function renderVacationChart(year, period) {
         default: monthsToShow = [0,1,2,3,4,5,6,7,8,9,10,11];
     }
     
-    // Подсчитываем общее количество дней в периоде
+    // ✅ ВАЖНО: Считаем общее количество дней для единой сетки
     let totalDays = 0;
+    const monthDays = [];
     monthsToShow.forEach(monthIdx => {
-        totalDays += new Date(year, monthIdx + 1, 0).getDate();
+        const days = new Date(year, monthIdx + 1, 0).getDate();
+        monthDays.push(days);
+        totalDays += days;
     });
     
-    console.log('📊 Период:', period, 'Месяцев:', monthsToShow.length, 'Дней:', totalDays);
+    console.log('📊 Период:', period, 'Месяцев:', monthsToShow.length, 'Всего дней:', totalDays);
+    
+    // Создаем массив всех дат для периода
+    const allDates = [];
+    monthsToShow.forEach(monthIdx => {
+        const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+            allDates.push(new Date(year, monthIdx, d));
+        }
+    });
     
     // Создаем маппинг сотрудников
     const employeeMap = {};
@@ -604,14 +630,15 @@ function renderVacationChart(year, period) {
     html += '<div class="timeline-employee-col-header">Сотрудник</div>';
     html += '<div class="timeline-dates-header">';
     
-    let dayCounter = 0;
-    monthsToShow.forEach(monthIdx => {
-        const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+    // Рендерим заголовок с месяцами и днями
+    let dayIndex = 0;
+    monthsToShow.forEach((monthIdx, monthNum) => {
+        const daysInMonth = monthDays[monthNum];
         html += `<div class="timeline-month-group">`;
         html += `<div class="timeline-month-name">${monthNamesShort[monthIdx]}</div>`;
         html += `<div class="timeline-days">`;
         for (let d = 1; d <= daysInMonth; d++) {
-            const date = new Date(year, monthIdx, d);
+            const date = allDates[dayIndex];
             const dateKey = formatDateKey(date);
             const dayOfWeek = date.getDay();
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -623,8 +650,8 @@ function renderVacationChart(year, period) {
             else if (isWeekend) dayClass += ' weekend';
             if (isPreHoliday) dayClass += ' preholiday';
             
-            html += `<div class="${dayClass}" data-day="${dayCounter}">${d}</div>`;
-            dayCounter++;
+            html += `<div class="${dayClass}">${d}</div>`;
+            dayIndex++;
         }
         html += `</div></div>`;
     });
@@ -647,67 +674,61 @@ function renderVacationChart(year, period) {
         html += `<div class="timeline-employee-name">${escapeHtml(emp.name)}</div>`;
         html += '<div class="timeline-employee-cells">';
         
-        dayCounter = 0;
-        monthsToShow.forEach(monthIdx => {
-            const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+        // ✅ ВАЖНО: Используем ТОТ ЖЕ массив allDates для тела
+        allDates.forEach((currentDate, idx) => {
+            const dateKey = formatDateKey(currentDate);
+            let cellClass = 'timeline-cell';
+            let cellTitle = '';
+            let cellContent = '';
             
-            for (let d = 1; d <= daysInMonth; d++) {
-                const currentDate = new Date(year, monthIdx, d);
-                const dateKey = formatDateKey(currentDate);
-                let cellClass = 'timeline-cell';
-                let cellTitle = '';
-                let cellContent = '';
-                
-                // Проверяем отпуск
-                const vacationPeriod = emp.periods.find(p => 
-                    currentDate >= p.start && currentDate <= p.end
+            // Проверяем отпуск
+            const vacationPeriod = emp.periods.find(p => 
+                currentDate >= p.start && currentDate <= p.end
+            );
+            
+            if (vacationPeriod) {
+                const hasOverlap = overlaps.some(o => 
+                    o.empId === empId && 
+                    currentDate >= o.start && 
+                    currentDate <= o.end
                 );
                 
-                if (vacationPeriod) {
-                    const hasOverlap = overlaps.some(o => 
-                        o.empId === empId && 
-                        currentDate >= o.start && 
-                        currentDate <= o.end
-                    );
-                    
-                    if (hasOverlap) {
-                        cellClass += ' overlap';
-                        cellTitle = 'Пересечение отпусков';
-                    } else if (vacationPeriod.type && vacationPeriod.type.includes('Больничный')) {
-                        cellClass += ' sick';
-                        cellTitle = 'Больничный';
-                    } else if (vacationPeriod.type && !vacationPeriod.type.includes('Ежегодный')) {
-                        cellClass += ' other-vacation';
-                        cellTitle = vacationPeriod.type;
-                    } else {
-                        cellClass += ' vacation';
-                        cellTitle = 'Ежегодный отпуск';
-                    }
-                    
-                    cellContent = '●';
+                if (hasOverlap) {
+                    cellClass += ' overlap';
+                    cellTitle = 'Пересечение отпусков';
+                } else if (vacationPeriod.type && vacationPeriod.type.includes('Больничный')) {
+                    cellClass += ' sick';
+                    cellTitle = 'Больничный';
+                } else if (vacationPeriod.type && !vacationPeriod.type.includes('Ежегодный')) {
+                    cellClass += ' other-vacation';
+                    cellTitle = vacationPeriod.type;
+                } else {
+                    cellClass += ' vacation';
+                    cellTitle = 'Ежегодный отпуск';
                 }
                 
-                // Выходные и праздники из производственного календаря
-                const dayOfWeek = currentDate.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                const isHoliday = productionCalendar[dateKey]?.isHoliday || false;
-                const isPreHoliday = productionCalendar[dateKey]?.isPreHoliday || false;
-                
-                if (isHoliday) {
-                    cellClass += ' holiday';
-                    if (!cellTitle) cellTitle = 'Праздничный день';
-                } else if (isWeekend) {
-                    cellClass += ' weekend';
-                    if (!cellTitle) cellTitle = 'Выходной день';
-                }
-                if (isPreHoliday) {
-                    cellClass += ' preholiday';
-                    if (!cellTitle) cellTitle = 'Предпраздничный день';
-                }
-                
-                html += `<div class="${cellClass}" title="${cellTitle}">${cellContent}</div>`;
-                dayCounter++;
+                cellContent = '●';
             }
+            
+            // Выходные и праздники
+            const dayOfWeek = currentDate.getDay();
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const isHoliday = productionCalendar[dateKey]?.isHoliday || false;
+            const isPreHoliday = productionCalendar[dateKey]?.isPreHoliday || false;
+            
+            if (isHoliday) {
+                cellClass += ' holiday';
+                if (!cellTitle) cellTitle = 'Праздничный день';
+            } else if (isWeekend) {
+                cellClass += ' weekend';
+                if (!cellTitle) cellTitle = 'Выходной день';
+            }
+            if (isPreHoliday) {
+                cellClass += ' preholiday';
+                if (!cellTitle) cellTitle = 'Предпраздничный день';
+            }
+            
+            html += `<div class="${cellClass}" title="${cellTitle}">${cellContent}</div>`;
         });
         
         html += '</div></div>';
