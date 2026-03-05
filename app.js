@@ -204,11 +204,15 @@ function parseCalendarFromHTML(html, year) {
                     const key = `${year}-${String(currentMonth).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
                     const cls = cell.className || '';
                     
-                    // ✅ ИСПРАВЛЕНО: Предпраздничные дни НЕ являются праздниками
+                    // ✅ ИСПРАВЛЕНО: Предпраздничные дни — это РАБОЧИЕ дни!
+                    const isWeekend = cls.includes('weekend');
+                    const isHoliday = cls.includes('holiday');
+                    const isPreHoliday = cls.includes('preholiday');
+                    
                     calendar[key] = {
-                        isWorking: !cls.includes('weekend') && !cls.includes('holiday'),
-                        isHoliday: cls.includes('weekend') || cls.includes('holiday'),
-                        isPreHoliday: cls.includes('preholiday'),
+                        isWorking: !isWeekend && !isHoliday, // ✅ Предпраздничные = рабочие!
+                        isHoliday: isWeekend || isHoliday,
+                        isPreHoliday: isPreHoliday,
                         day, month: currentMonth
                     };
                 }
@@ -216,6 +220,7 @@ function parseCalendarFromHTML(html, year) {
         });
     });
     
+    // Заполняем пропущенные дни
     for (let m = 1; m <= 12; m++) {
         const days = new Date(year, m, 0).getDate();
         for (let d = 1; d <= days; d++) {
@@ -427,8 +432,10 @@ function generateRemoteLogic(year, month) {
         
         for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate()+1)) {
             const key = formatDateKey(d);
+            const dayData = productionCalendar[key];
             
-            if (!productionCalendar[key]?.isWorking) continue;
+            // ✅ ИСПРАВЛЕНО: Предпраздничные дни — РАБОЧИЕ, учитываем их!
+            if (!dayData || !dayData.isWorking) continue;
             
             const isRegularAbsent = regularAbs[emp.id]?.some(p => d >= p.start && d <= p.end);
             if (isRegularAbsent) continue;
@@ -438,6 +445,8 @@ function generateRemoteLogic(year, month) {
             const wd = dayNames[d.getDay()];
             const isPreferredDay = emp.remoteDays.some(pref => wd.includes(pref));
             
+            // ✅ Добавляем если: день по графику ИЛИ больничный удаленно
+            // Предпраздничные дни тоже учитываются!
             if ((isPreferredDay && !isRemoteSick) || isRemoteSick) {
                 dates.push(new Date(d));
             }
@@ -840,3 +849,4 @@ window.generateVacationChart = generateVacationChart;
 window.downloadResults = downloadResults;
 window.exportDataJSON = exportDataJSON;
 window.clearAllData = clearAllData;
+
