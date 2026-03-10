@@ -204,13 +204,13 @@ function parseCalendarFromHTML(html, year) {
                     const key = `${year}-${String(currentMonth).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
                     const cls = cell.className || '';
                     
-                    // ✅ ИСПРАВЛЕНО: Предпраздничные дни — это РАБОЧИЕ дни!
                     const isWeekend = cls.includes('weekend');
                     const isHoliday = cls.includes('holiday');
                     const isPreHoliday = cls.includes('preholiday');
                     
+                    // ✅ ИСПРАВЛЕНО: Предпраздничные дни — это РАБОЧИЕ дни!
                     calendar[key] = {
-                        isWorking: !isWeekend && !isHoliday, // ✅ Предпраздничные = рабочие!
+                        isWorking: (!isWeekend && !isHoliday) || isPreHoliday, // ✅ Предпраздничные = рабочие!
                         isHoliday: isWeekend || isHoliday,
                         isPreHoliday: isPreHoliday,
                         day, month: currentMonth
@@ -434,8 +434,11 @@ function generateRemoteLogic(year, month) {
             const key = formatDateKey(d);
             const dayData = productionCalendar[key];
             
-            // ✅ ИСПРАВЛЕНО: Предпраздничные дни — РАБОЧИЕ, учитываем их!
-            if (!dayData || !dayData.isWorking) continue;
+            // ✅ Пропускаем только НЕ рабочие дни
+            // Предпраздничные дни (isPreHoliday=true) имеют isWorking=true
+            if (!dayData || !dayData.isWorking) {
+                continue;
+            }
             
             const isRegularAbsent = regularAbs[emp.id]?.some(p => d >= p.start && d <= p.end);
             if (isRegularAbsent) continue;
@@ -445,8 +448,7 @@ function generateRemoteLogic(year, month) {
             const wd = dayNames[d.getDay()];
             const isPreferredDay = emp.remoteDays.some(pref => wd.includes(pref));
             
-            // ✅ Добавляем если: день по графику ИЛИ больничный удаленно
-            // Предпраздничные дни тоже учитываются!
+            // Добавляем если: день по графику ИЛИ больничный удаленно
             if ((isPreferredDay && !isRemoteSick) || isRemoteSick) {
                 dates.push(new Date(d));
             }
@@ -849,4 +851,5 @@ window.generateVacationChart = generateVacationChart;
 window.downloadResults = downloadResults;
 window.exportDataJSON = exportDataJSON;
 window.clearAllData = clearAllData;
+
 
